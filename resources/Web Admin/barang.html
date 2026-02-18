@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Manajemen Barang - Admin Panel</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <style>
+        * { padding: 0; margin: 0; box-sizing: border-box; }
+        .layout { display: grid; grid-template-columns: 20% 80%; min-height: 100vh; }
+        .sidebar { background-color: #30364F; padding: 30px; color: #fff; }
+        .nav-link-custom { color: #ccc; padding: 12px; text-decoration: none; display: block; border-radius: 5px; margin-bottom: 5px; transition: 0.3s; }
+        .nav-link-custom:hover, .nav-link-custom.active { background-color: #404765; color: #fff; }
+        .badge-kondisi { font-size: 0.8rem; text-transform: capitalize; }
+        /* Style untuk Tab di Modal Detail */
+        .nav-tabs .nav-link { color: #495057; }
+        .nav-tabs .nav-link.active { font-weight: bold; color: #0d6efd; }
+    </style>
+</head>
+<body>
+    <main class="layout">
+        <aside class="sidebar d-flex flex-column justify-content-between">
+            
+            <div>
+                <h3 class="text-center mb-4">Admin Panel</h3>
+                <div class="d-flex flex-column">
+                    <a href="dashboard.html" class="nav-link-custom"><i class="bi bi-speedometer2 me-2"></i> Dasbor</a>
+                    <a href="barang.html" class="nav-link-custom active"><i class="bi bi-box-seam me-2"></i> Barang</a>
+                    <a href="kontrak.html" class="nav-link-custom"><i class="bi bi-file-earmark-text me-2"></i> Kontrak</a>
+                    <a href="user.html" class="nav-link-custom"><i class="bi bi-people me-2"></i> User</a>
+                    <a href="karyawan.html" class="nav-link-custom"><i class="bi bi-person-badge me-2"></i> Karyawan</a>
+                    <a href="mobilisasi.html" class="nav-link-custom"><i class="bi bi-arrow-left-right me-2"></i> Mobilisasi</a>
+                </div>
+            </div>
+
+            <div class="mt-auto user-panel">
+                <div class="d-flex align-items-center mb-3">
+                    <div class="bg-primary rounded-circle d-flex align-items-center justify-content-center me-2" style="width: 40px; height: 40px;">
+                        <i class="bi bi-person-fill h5 m-0 text-white"></i>
+                    </div>
+                    <div>
+                        <small class="d-block text-light" style="font-size: 0.75rem;">Login sebagai:</small>
+                        <span class="fw-bold">Admin IT</span>
+                    </div>
+                </div>
+                <button onclick="logout()" class="btn btn-danger w-100 btn-sm">
+                    <i class="bi bi-box-arrow-right me-2"></i> Logout
+                </button>
+            </div>
+        </aside>
+
+        <div class="p-5" style="background-color: #f8f9fa;">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div>
+                    <h3>Master Data Barang</h3>
+                    <p class="text-muted">Manajemen seluruh daftar barang dan inventaris aset.</p>
+                </div>
+                <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalTambahBarang">
+                    <i class="bi bi-plus-lg"></i> Tambah Barang Baru
+                </button>
+            </div>
+
+            <div class="card shadow-sm border-0">
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th class="ps-3">Kode Barcode</th>
+                                    <th>Nama Barang</th>
+                                    <th>Kuantitas</th>
+                                    <th>Status Penguasaan</th>
+                                    <th>Kondisi</th>
+                                    <th class="text-center">Aksi</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td class="ps-3 fw-bold">LP-DELL-001</td>
+                                    <td>Laptop Dell Latitude 5420</td>
+                                    <td>1 Unit</td>
+                                    <td><i class="bi bi-person me-1"></i> Budi Santoso (Personal)</td>
+                                    <td><span class="badge bg-success badge-kondisi">Baik</span></td>
+                                    <td class="text-center">
+                                        <button class="btn btn-sm btn-outline-info" onclick="showDetail('101')" title="Lihat Detail"><i class="bi bi-eye"></i></button>
+                                        <button class="btn btn-sm btn-outline-warning" onclick="showEdit('101')" title="Edit"><i class="bi bi-pencil"></i></button>
+                                        <button class="btn btn-sm btn-outline-danger" title="Hapus"><i class="bi bi-trash"></i></button>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td class="ps-3 fw-bold">AC-SRV-02</td>
+                                    <td>AC Server Lt. 2</td>
+                                    <td>1 Unit</td>
+                                    <td><i class="bi bi-geo-alt me-1"></i> R. Server (Lokasi)</td>
+                                    <td><span class="badge bg-warning text-dark badge-kondisi">Rusak Ringan</span></td>
+                                    <td class="text-center">
+                                        <button class="btn btn-sm btn-outline-info" onclick="showDetail('102')"><i class="bi bi-eye"></i></button>
+                                        <button class="btn btn-sm btn-outline-warning" onclick="showEdit('102')"><i class="bi bi-pencil"></i></button>
+                                        <button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <div class="modal fade" id="modalTambahBarang" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Registrasi Barang Baru</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="formBarang">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Nomor Kontrak</label>
+                                <select class="form-select" required>
+                                    <option value="">Pilih Kontrak...</option>
+                                    <option value="1">SPK/IT/001/2024</option>
+                                    <option value="2">SPK/GA/055/2023</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Kode Barcode</label>
+                                <input type="text" class="form-control" placeholder="Contoh: INV-001" required>
+                            </div>
+                            <div class="col-md-8">
+                                <label class="form-label">Nama Barang</label>
+                                <input type="text" class="form-control" required>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Jumlah Barang (QTY)</label>
+                                <input type="number" class="form-control" value="1" min="1" required>
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label">Spesifikasi Detail</label>
+                                <textarea class="form-control" rows="3"></textarea>
+                            </div>
+                            
+                            <div class="col-12 mt-4">
+                                <label class="form-label d-block fw-bold">Penempatan Awal</label>
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input" type="radio" name="statusAset" id="radioPersonal" value="personal" checked onchange="toggleInput('tambah')">
+                                    <label class="form-check-label" for="radioPersonal">Aset Personal (Karyawan)</label>
+                                </div>
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input" type="radio" name="statusAset" id="radioLokasi" value="lokasi" onchange="toggleInput('tambah')">
+                                    <label class="form-check-label" for="radioLokasi">Aset Lokasi (Ruangan)</label>
+                                </div>
+                            </div>
+
+                            <div class="col-md-12" id="inputPemegang_tambah">
+                                <label class="form-label">Pilih Karyawan Pemegang</label>
+                                <select class="form-select">
+                                    <option value="">Pilih Nama Karyawan...</option>
+                                    <option value="1">Ahmad Teknisi</option>
+                                    <option value="2">Budi Santoso</option>
+                                </select>
+                            </div>
+
+                            <div class="col-md-12 d-none" id="inputLokasi_tambah">
+                                <label class="form-label">Lokasi Fisik Ruangan</label>
+                                <input type="text" class="form-control" placeholder="Misal: R. Server Lt. 2">
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
+                    <button type="submit" form="formBarang" class="btn btn-primary">Simpan</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="modalEditBarang" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header bg-warning-subtle">
+                    <h5 class="modal-title">Edit Data Barang</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="formEdit">
+                        <input type="hidden" id="edit_id_barang"> <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Nomor Kontrak</label>
+                                <select class="form-select" id="edit_kontrak" disabled> <option value="1">SPK/IT/001/2024</option>
+                                    <option value="2">SPK/GA/055/2023</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Kode Barcode</label>
+                                <input type="text" class="form-control" id="edit_barcode" readonly> </div>
+                            <div class="col-md-8">
+                                <label class="form-label">Nama Barang</label>
+                                <input type="text" class="form-control" id="edit_nama" required>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Jumlah Barang</label>
+                                <input type="number" class="form-control" id="edit_qty" required>
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label">Spesifikasi</label>
+                                <textarea class="form-control" id="edit_spek" rows="3"></textarea>
+                            </div>
+
+                            <div class="col-12 mt-4">
+                                <label class="form-label fw-bold">Posisi Saat Ini</label>
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input" type="radio" name="editStatusAset" id="editRadioPersonal" value="personal" onchange="toggleInput('edit')">
+                                    <label class="form-check-label">Personal</label>
+                                </div>
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input" type="radio" name="editStatusAset" id="editRadioLokasi" value="lokasi" onchange="toggleInput('edit')">
+                                    <label class="form-check-label">Lokasi</label>
+                                </div>
+                            </div>
+
+                            <div class="col-md-12" id="inputPemegang_edit">
+                                <select class="form-select" id="edit_pemegang">
+                                    <option value="">Pilih Karyawan...</option>
+                                    <option value="1">Ahmad Teknisi</option>
+                                    <option value="2">Budi Santoso</option>
+                                </select>
+                            </div>
+                            <div class="col-md-12 d-none" id="inputLokasi_edit">
+                                <input type="text" class="form-control" id="edit_lokasi_text">
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
+                    <button type="button" class="btn btn-primary" onclick="alert('Data berhasil diupdate (Simulasi)')">Update Data</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="modalDetailBarang" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <div>
+                        <h5 class="modal-title" id="detail_nama_header">Nama Barang Disini</h5>
+                        <small class="text-muted" id="detail_barcode_header">CODE-123</small>
+                    </div>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    
+                    <ul class="nav nav-tabs mb-3" id="myTab" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link active" id="info-tab" data-bs-toggle="tab" data-bs-target="#info-pane" type="button" role="tab">Informasi Umum</button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="kontrak-tab" data-bs-toggle="tab" data-bs-target="#kontrak-pane" type="button" role="tab">Detail Kontrak</button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="history-tab" data-bs-toggle="tab" data-bs-target="#history-pane" type="button" role="tab">Riwayat Kondisi</button>
+                        </li>
+                    </ul>
+
+                    <div class="tab-content" id="myTabContent">
+                        
+                        <div class="tab-pane fade show active" id="info-pane" role="tabpanel">
+                            <table class="table table-borderless">
+                                <tr>
+                                    <td width="30%" class="fw-bold">Spesifikasi</td>
+                                    <td>: <span id="detail_spek">-</span></td>
+                                </tr>
+                                <tr>
+                                    <td class="fw-bold">Kuantitas</td>
+                                    <td>: <span id="detail_qty">0</span> Unit</td>
+                                </tr>
+                                <tr>
+                                    <td class="fw-bold">Status Penguasaan</td>
+                                    <td>: <span id="detail_posisi">-</span></td>
+                                </tr>
+                                <tr>
+                                    <td class="fw-bold">Kondisi Terkini</td>
+                                    <td>: <span class="badge bg-success" id="detail_kondisi">Baik</span></td>
+                                </tr>
+                            </table>
+                            <div class="text-center mt-3 p-3 bg-light rounded">
+                                <small>Barcode Preview:</small><br>
+                                <i class="bi bi-upc-scan" style="font-size: 3rem;"></i><br>
+                                <span id="detail_barcode_img">12345678</span>
+                            </div>
+                        </div>
+
+                        <div class="tab-pane fade" id="kontrak-pane" role="tabpanel">
+                            <div class="alert alert-info">
+                                <i class="bi bi-info-circle me-2"></i>Data diambil dari tabel <b>m_kontrak</b>.
+                            </div>
+                            <table class="table">
+                                <tr>
+                                    <th width="30%">Nomor SPK/Kontrak</th>
+                                    <td><span id="detail_no_kontrak">-</span></td>
+                                </tr>
+                                <tr>
+                                    <th>Tahun Pengadaan</th>
+                                    <td><span id="detail_thn_kontrak">-</span></td>
+                                </tr>
+                                <tr>
+                                    <th>Vendor / Supplier</th>
+                                    <td><span id="detail_vendor">-</span></td>
+                                </tr>
+                                <tr>
+                                    <th>Pihak Pengada</th>
+                                    <td><span id="detail_pengada">-</span></td>
+                                </tr>
+                            </table>
+                        </div>
+
+                        <div class="tab-pane fade" id="history-pane" role="tabpanel">
+                            <div class="table-responsive">
+                                <table class="table table-sm table-striped">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>Tanggal Lapor</th>
+                                            <th>Kondisi</th>
+                                            <th>Pelapor</th>
+                                            <th>Bukti Foto</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="table_history_body">
+                                        </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Tutup</button>
+                    <button type="button" class="btn btn-warning" onclick="switchModalToEdit()">Edit Barang Ini</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <script>
+        // ==========================================
+        // 1. DATA DUMMY (Pura-pura Database)
+        // ==========================================
+        const databaseBarang = {
+            '101': {
+                id: '101', barcode: 'LP-DELL-001', nama: 'Laptop Dell Latitude 5420', 
+                qty: 1, spek: 'Core i5 Gen 11, RAM 16GB, SSD 512GB',
+                tipe: 'personal', pemegang: '2', lokasi: '', kondisi: 'Baik',
+                kontrak: { no: 'SPK/IT/001/2024', thn: '2024', vendor: 'PT. Solusi Digital', pengada: 'Divisi IT' },
+                history: [
+                    { tgl: '12 Feb 2026', status: 'Baik', pelapor: 'Budi Santoso', foto: 'img1.jpg' },
+                    { tgl: '10 Jan 2026', status: 'Baik', pelapor: 'Admin IT', foto: 'img2.jpg' }
+                ]
+            },
+            '102': {
+                id: '102', barcode: 'AC-SRV-02', nama: 'AC Server Lt. 2', 
+                qty: 1, spek: 'Daikin 2PK Inverter',
+                tipe: 'lokasi', pemegang: '', lokasi: 'R. Server Lt. 2', kondisi: 'Rusak Ringan',
+                kontrak: { no: 'PO-9982-XM', thn: '2025', vendor: 'PT. Elektronik Nusantara', pengada: 'Operasional' },
+                history: [
+                    { tgl: '11 Feb 2026', status: 'Rusak Ringan', pelapor: 'Security', foto: 'rusak.jpg' },
+                    { tgl: '01 Feb 2026', status: 'Baik', pelapor: 'Maintenance', foto: 'ok.jpg' }
+                ]
+            }
+        };
+
+        // ==========================================
+        // 2. LOGIKA TAMPILKAN MODAL DETAIL
+        // ==========================================
+        function showDetail(id) {
+            const data = databaseBarang[id];
+            
+            // Isi Header
+            document.getElementById('detail_nama_header').innerText = data.nama;
+            document.getElementById('detail_barcode_header').innerText = data.barcode;
+
+            // Isi Tab 1: Info
+            document.getElementById('detail_spek').innerText = data.spek;
+            document.getElementById('detail_qty').innerText = data.qty;
+            document.getElementById('detail_kondisi').innerText = data.kondisi;
+            document.getElementById('detail_barcode_img').innerText = data.barcode;
+            
+            if(data.tipe === 'personal') {
+                document.getElementById('detail_posisi').innerText = "Personal (ID Pemegang: " + data.pemegang + ")";
+            } else {
+                document.getElementById('detail_posisi').innerText = "Lokasi: " + data.lokasi;
+            }
+
+            // Isi Tab 2: Kontrak
+            document.getElementById('detail_no_kontrak').innerText = data.kontrak.no;
+            document.getElementById('detail_thn_kontrak').innerText = data.kontrak.thn;
+            document.getElementById('detail_vendor').innerText = data.kontrak.vendor;
+            document.getElementById('detail_pengada').innerText = data.kontrak.pengada;
+
+            // Isi Tab 3: History (Looping Data Array)
+            const tbody = document.getElementById('table_history_body');
+            tbody.innerHTML = ''; // Kosongkan dulu
+            data.history.forEach(row => {
+                const tr = `
+                    <tr>
+                        <td>${row.tgl}</td>
+                        <td><span class="badge bg-${row.status === 'Baik' ? 'success' : 'warning'}">${row.status}</span></td>
+                        <td>${row.pelapor}</td>
+                        <td><a href="#" class="btn btn-xs btn-outline-secondary"><i class="bi bi-image"></i> Lihat</a></td>
+                    </tr>
+                `;
+                tbody.innerHTML += tr;
+            });
+
+            // Tampilkan Modal
+            new bootstrap.Modal(document.getElementById('modalDetailBarang')).show();
+            
+            // Simpan ID sementara jika user mau klik Edit dari modal detail
+            document.getElementById('edit_id_barang').value = id; 
+        }
+
+        // ==========================================
+        // 3. LOGIKA TAMPILKAN MODAL EDIT
+        // ==========================================
+        function showEdit(id) {
+            const data = databaseBarang[id];
+
+            // Isi Form Edit
+            document.getElementById('edit_id_barang').value = data.id;
+            document.getElementById('edit_nama').value = data.nama;
+            document.getElementById('edit_barcode').value = data.barcode;
+            document.getElementById('edit_qty').value = data.qty;
+            document.getElementById('edit_spek').value = data.spek;
+
+            // Set Radio Button & Tampilan Input
+            if(data.tipe === 'personal') {
+                document.getElementById('editRadioPersonal').checked = true;
+                document.getElementById('edit_pemegang').value = data.pemegang;
+                toggleInput('edit'); // Refresh tampilan
+            } else {
+                document.getElementById('editRadioLokasi').checked = true;
+                document.getElementById('edit_lokasi_text').value = data.lokasi;
+                toggleInput('edit'); // Refresh tampilan
+            }
+
+            // Tutup modal detail jika terbuka, lalu buka modal edit
+            const detailModalEl = document.getElementById('modalDetailBarang');
+            const detailModal = bootstrap.Modal.getInstance(detailModalEl);
+            if(detailModal) detailModal.hide();
+
+            new bootstrap.Modal(document.getElementById('modalEditBarang')).show();
+        }
+
+        function switchModalToEdit() {
+            const id = document.getElementById('edit_id_barang').value;
+            showEdit(id);
+        }
+
+        // ==========================================
+        // 4. LOGIKA UTILITY (Radio Button)
+        // ==========================================
+        function toggleInput(mode) {
+            // Mode bisa 'tambah' atau 'edit'
+            let isPersonal, inputPemegang, inputLokasi;
+
+            if (mode === 'tambah') {
+                isPersonal = document.getElementById('radioPersonal').checked;
+                inputPemegang = document.getElementById('inputPemegang_tambah');
+                inputLokasi = document.getElementById('inputLokasi_tambah');
+            } else {
+                isPersonal = document.getElementById('editRadioPersonal').checked;
+                inputPemegang = document.getElementById('inputPemegang_edit');
+                inputLokasi = document.getElementById('inputLokasi_edit');
+            }
+
+            if (isPersonal) {
+                inputPemegang.classList.remove('d-none');
+                inputLokasi.classList.add('d-none');
+            } else {
+                inputPemegang.classList.add('d-none');
+                inputLokasi.classList.remove('d-none');
+            }
+        }
+        function logout() {
+            if(confirm("Apakah Anda yakin ingin keluar dari sistem?")) {
+                // Di sini nanti arahkan ke file login.php atau login.html
+                alert("Anda berhasil logout!");
+                window.location.href = "login.html"; 
+            }
+        }
+    </script>
+</body>
+</html>
