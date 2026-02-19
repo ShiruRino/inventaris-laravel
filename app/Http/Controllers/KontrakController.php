@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Kontrak;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Validator;
 
 class KontrakController extends Controller
 {
@@ -12,7 +13,8 @@ class KontrakController extends Controller
      */
     public function index()
     {
-        
+        $kontrak =Kontrak::latest()->paginate(10);
+        return view("kontrak.index", compact("kontrak"));
     }
 
     /**
@@ -28,15 +30,27 @@ class KontrakController extends Controller
      */
     public function store(Request $request)
     {
-        //
+        $rules = [
+            "no_kontrak"=> "required|unique:m_kontrak,no_kontrak",
+            'tahun_kontrak' => 'required|integer|digits:4|between:1900,2100',
+            "nama_vendor"=> "required",
+            "pihak_pengada"=> "required",
+        ];
+        $validator = Validator::make($request->all(), $rules);
+        if ($validator->fails()) {
+            return redirect()->back()->withErrors($validator)->withInput();
+        }
+        Kontrak::create($request->all());
+        return redirect()->route('kontrak.index')->with("success","Data Kontrak berhasil ditambahkan.");
     }
 
     /**
      * Display the specified resource.
      */
-    public function show(Kontrak $kontrak)
+    public function show($id)
     {
-        //
+        $kontrak =Kontrak::with('barang')->findOrFail($id);
+        return response()->json($kontrak);
     }
 
     /**
@@ -52,7 +66,9 @@ class KontrakController extends Controller
      */
     public function update(Request $request, Kontrak $kontrak)
     {
-        //
+        $kontrak->update($request->all());
+        $kontrak->save();
+        return redirect()->route('kontrak.index')->with('success','Data Kontrak berhasil diperbarui');
     }
 
     /**
@@ -60,6 +76,7 @@ class KontrakController extends Controller
      */
     public function destroy(Kontrak $kontrak)
     {
-        //
+        $kontrak->delete();
+        return redirect()->route('kontrak.index')->with('success','Data Kontrak berhasil dihapus.');
     }
 }

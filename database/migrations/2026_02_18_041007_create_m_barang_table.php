@@ -14,12 +14,12 @@ return new class extends Migration
         Schema::create('m_barang', function (Blueprint $table) {
             $table->id('id_barang');
             $table->foreignId('id_kontrak')->constrained('m_kontrak', 'id_kontrak')->cascadeOnDelete();
-            $table->string('kode_barcode');
+            $table->string('kode_barcode')->unique();
             $table->string('nama_barang');
             $table->text('spesifikasi');
             $table->integer('jumlah_barang');
             $table->string('lokasi_fisik')->nullable();
-            $table->foreignId('id_karyawan_pemegang')->nullable();
+            $table->foreignId('id_karyawan_pemegang')->nullable()->constrained('m_karyawan', "id_karyawan")->cascadeOnDelete();
             $table->timestamps();
         });
     }

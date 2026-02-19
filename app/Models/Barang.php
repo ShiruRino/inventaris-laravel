@@ -24,7 +24,7 @@ class Barang extends Model
         return $this->belongsTo(Mobilisasi::class, 'id_barang');
     }
     public function kondisi(){
-        return $this->belongsTo(Kondisi::class, 'id_barang');
+        return $this->hasMany(Kondisi::class, 'id_barang');
     }
     public function karyawan(){
         return $this->belongsTo(Karyawan::class, 'id_karyawan_pemegang');

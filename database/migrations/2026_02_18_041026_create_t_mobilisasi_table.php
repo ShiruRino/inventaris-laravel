@@ -14,12 +14,11 @@ return new class extends Migration
         Schema::create('t_mobilisasi', function (Blueprint $table) {
             $table->id('id_mobilisasi');
             $table->foreignId('id_barang')->constrained('m_barang', 'id_barang')->cascadeOnDelete();
-            $table->foreignId('id_pemberi')->nullable()->constrained('m_karyawan', 'id_karyawan')->cascadeOnDelete();
+            $table->string('asal');
             $table->foreignId('id_penerima')->nullable()->constrained('m_karyawan', 'id_karyawan')->cascadeOnDelete();
-            $table->string('lokasi_tujuan');
+            $table->string('lokasi_tujuan')->nullable();
             $table->foreignId('id_user_operator')->constrained('m_user', 'id_user')->cascadeOnDelete();
-            $table->tinyInteger('status_terima');
-            $table->string('bukti_serah_terima');
+            $table->string('bukti_serah_terima')->nullable();
             $table->timestamps();
         });
     }

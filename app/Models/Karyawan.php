@@ -13,12 +13,10 @@ class Karyawan extends Model
         'nama_karyawan',
         'divisi',
         'jabatan',
+        'kontak',
     ];
     public function user(){
         return $this->hasOne(User::class, 'id_user');
-    }
-    public function pemberi_mobilisasi(){
-        return $this->hasMany(Mobilisasi::class, 'id_pemberi');
     }
     public function penerima_mobilisasi(){
         return $this->hasMany(Mobilisasi::class, 'id_penerima');

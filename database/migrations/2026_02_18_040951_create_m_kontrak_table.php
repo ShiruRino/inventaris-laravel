@@ -13,7 +13,7 @@ return new class extends Migration
     {
         Schema::create('m_kontrak', function (Blueprint $table) {
             $table->id('id_kontrak');
-            $table->string('no_kontrak');
+            $table->string('no_kontrak')->unique();
             $table->year('tahun_kontrak');
             $table->string('nama_vendor');
             $table->string('pihak_pengada');

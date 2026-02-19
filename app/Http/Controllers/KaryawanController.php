@@ -13,8 +13,8 @@ class KaryawanController extends Controller
      */
     public function index()
     {
-        $employees = Karyawan::orderBy('nama_karyawan');
-        return view('karyawan.index',compact('employees'));
+        $karyawan = Karyawan::orderBy('nama_karyawan')->paginate(10);
+        return view('karyawan.index',compact('karyawan'));
     }
 
     /**
@@ -35,26 +35,23 @@ class KaryawanController extends Controller
             'nama_karyawan' => 'required|unique:m_karyawan,nip',
             'divisi' => 'required',
             'jabatan' => 'required',
+            'kontak' => 'required',
         ];
-        $validatedData = Validator::make($request->all, $rules);
+        $validatedData = Validator::make($request->all(), $rules);
         if($validatedData->fails()){
             return back()->withErrors($validatedData)->withInput();
         }
-        Karyawan::create([
-            'nip' => $request->nip,
-            'nama_karyawan' => $request->nama_karyawan,
-            'divisi' => $request->divisi,
-            'jabatan' => $request->jabatan,
-        ]);
+        Karyawan::create($request->all());
         return redirect()->route('karyawan.index')->with('success', 'Data Karyawan berhasil ditambahkan');
         }
         
         /**
      * Display the specified resource.
      */
-    public function show(Karyawan $karyawan)
+    public function show($id)
     {
-        //
+        $employee = Karyawan::with('barang')->findOrFail($id);
+        return response()->json($employee);
     }
 
     /**
@@ -70,25 +67,27 @@ class KaryawanController extends Controller
      */
     public function update(Request $request, Karyawan $karyawan)
     {
-        $rules = [
-            'id_karyawan' => 'required',
-            'nip' => 'required|unique:m_karyawan,nip,'.$karyawan->nip,
-            'nama_karyawan' => 'required',
-            'divisi' => 'required',
-            'jabatan' => 'required',
-        ];
-        $validatedData = Validator::make($request->all, $rules);
-        if($validatedData->fails()){
-            return back()->withErrors($validatedData)->withInput();
-        }
+        // dd($request->all());
+        // $rules = [
+        //     'nip' => 'required|unique:m_karyawan,nip,'.$karyawan->nip . ',id_karyawan',
+        //     'nama_karyawan' => 'required',
+        //     'divisi' => 'required',
+        //     'jabatan' => 'required',
+        // ];
+        // $validatedData = Validator::make($request->all(), $rules);
+        // if($validatedData->fails()){
+        //     return back()->withErrors($validatedData)->withInput();
+        // }
         $karyawan->update([
             'nip' => $request->nip,
             'nama_karyawan' => $request->nama_karyawan,
             'divisi' => $request->divisi,
             'jabatan' => $request->jabatan,
+            'kontak' => $request->kontak,
         ]);
+        $karyawan->save();
         
-        return redirect()->route('karyawan.index')->with('success', 'Data Karyawan berhasil ditambahkan');
+        return redirect()->route('karyawan.index')->with('success', 'Data Karyawan berhasil diperbarui');
     }
 
     /**

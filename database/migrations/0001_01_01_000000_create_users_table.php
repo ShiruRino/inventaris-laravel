@@ -18,6 +18,7 @@ return new class extends Migration
             $table->string('nama_karyawan');
             $table->string('divisi');
             $table->string('jabatan');
+            $table->string('kontak')->nullable();
             $table->timestamps();
         });
         Schema::create('m_user', function (Blueprint $table) {

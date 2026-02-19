@@ -23,7 +23,8 @@ class DatabaseSeeder extends Seeder
             'nip' => '04832004',
             'nama_karyawan' => 'Muhammad Jibran Al Fabian',
             'divisi' => 'Website Developer',
-            'jabatan' => 'Junior Website Developer'
+            'jabatan' => 'Junior Website Developer',
+            'kontak' => '081937361264'
         ]);
         User::create([
             'id_karyawan' => 1,
