@@ -1,101 +1,87 @@
 <?php
-
 namespace App\Http\Controllers;
 
 use App\Models\Karyawan;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rule;
 
 class KaryawanController extends Controller
 {
-    /**
-     * Display a listing of the resource.
-     */
-    public function index()
+    public function index(Request $request)
     {
-        $karyawan = Karyawan::orderBy('nama_karyawan')->paginate(10);
-        return view('karyawan.index',compact('karyawan'));
+        $query = Karyawan::withCount('barang');
+
+        if ($request->has('search') && $request->search != '') {
+            $query->where(function($q) use ($request) {
+                $q->where('nama_karyawan', 'like', '%' . $request->search . '%')
+                  ->orWhere('nip', 'like', '%' . $request->search . '%');
+            });
+        }
+
+        if ($request->has('divisi') && $request->divisi != '') {
+            $query->where('divisi', $request->divisi);
+        }
+
+        if ($request->has('sort')) {
+            if ($request->sort == 'nama_asc') {
+                $query->orderBy('nama_karyawan', 'asc');
+            } elseif ($request->sort == 'nama_desc') {
+                $query->orderBy('nama_karyawan', 'desc');
+            } else {
+                $query->latest('id_karyawan');
+            }
+        } else {
+            $query->latest('id_karyawan');
+        }
+
+        $karyawan = $query->paginate(10);
+        return view('karyawan.index', compact('karyawan'));
     }
 
-    /**
-     * Show the form for creating a new resource.
-     */
-    public function create()
-    {
-        //
-    }
-
-    /**
-     * Store a newly created resource in storage.
-     */
     public function store(Request $request)
     {
-        $rules = [
-            'nip' => 'required',
-            'nama_karyawan' => 'required|unique:m_karyawan,nip',
-            'divisi' => 'required',
-            'jabatan' => 'required',
-            'kontak' => 'required',
-        ];
-        $validatedData = Validator::make($request->all(), $rules);
-        if($validatedData->fails()){
-            return back()->withErrors($validatedData)->withInput();
-        }
-        Karyawan::create($request->all());
+        $validated = $request->validate([
+            'nip'           => 'required|string|unique:m_karyawan,nip',
+            'nama_karyawan' => 'required|string|max:255',               
+            'divisi'        => 'required|string',
+            'jabatan'       => 'required|string',
+            'kontak'        => 'required|string',
+        ]);
+
+        Karyawan::create($validated);
+
         return redirect()->route('karyawan.index')->with('success', 'Data Karyawan berhasil ditambahkan');
-        }
+    }
         
-        /**
-     * Display the specified resource.
-     */
     public function show($id)
     {
-        $employee = Karyawan::with('barang')->findOrFail($id);
-        return response()->json($employee);
+        $karyawan = Karyawan::findOrFail($id);
+        return response()->json($karyawan->load('barang.latestKondisi'));
     }
 
-    /**
-     * Show the form for editing the specified resource.
-    */
-    public function edit(Karyawan $karyawan)
-    {
-        //
-    }
-
-    /**
-     * Update the specified resource in storage.
-     */
     public function update(Request $request, Karyawan $karyawan)
     {
-        // dd($request->all());
-        // $rules = [
-        //     'nip' => 'required|unique:m_karyawan,nip,'.$karyawan->nip . ',id_karyawan',
-        //     'nama_karyawan' => 'required',
-        //     'divisi' => 'required',
-        //     'jabatan' => 'required',
-        // ];
-        // $validatedData = Validator::make($request->all(), $rules);
-        // if($validatedData->fails()){
-        //     return back()->withErrors($validatedData)->withInput();
-        // }
-        $karyawan->update([
-            'nip' => $request->nip,
-            'nama_karyawan' => $request->nama_karyawan,
-            'divisi' => $request->divisi,
-            'jabatan' => $request->jabatan,
-            'kontak' => $request->kontak,
+        $validated = $request->validate([
+            'nip' => [
+                'required',
+                'string',
+                Rule::unique('m_karyawan', 'nip')->ignore($karyawan->id_karyawan, 'id_karyawan'),
+            ],
+            'nama_karyawan' => 'required|string|max:255',
+            'divisi'        => 'required|string',
+            'jabatan'       => 'required|string',
+            'kontak'        => 'required|string',
         ]);
-        $karyawan->save();
+
+        $karyawan->update($validated);
         
         return redirect()->route('karyawan.index')->with('success', 'Data Karyawan berhasil diperbarui');
     }
 
-    /**
-     * Remove the specified resource from storage.
-     */
     public function destroy(Karyawan $karyawan)
     {
         $karyawan->delete();
+        
         return redirect()->route('karyawan.index')->with('success', 'Data Karyawan berhasil dihapus.');
     }
 }

@@ -1,130 +1,250 @@
 <?php
-
 namespace App\Http\Controllers;
 
 use App\Models\Barang;
 use App\Models\Karyawan;
+use App\Models\Kondisi;
 use App\Models\Kontrak;
 use App\Models\Mobilisasi;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Milon\Barcode\DNS2D;
 
 class BarangController extends Controller
 {
-    /**
-     * Display a listing of the resource.
-     */
-    public function index()
+    public function index(Request $request)
     {
-        $barang = Barang::with(['karyawan', 'kontrak'])->latest()->paginate(10);
-        $kontrak = Kontrak::all(); // For dropdown
-        $karyawan = Karyawan::all(); // For dropdown
+        $query = Barang::with(['karyawan', 'kontrak', 'latestKondisi']);
+
+        if ($request->has('search') && $request->search != '') {
+            $query->where(function($q) use ($request) {
+                $q->where('nama_barang', 'like', '%' . $request->search . '%')
+                  ->orWhere('kode_barcode', 'like', '%' . $request->search . '%');
+            });
+        }
+
+        if ($request->has('kategori') && $request->kategori != '') {
+            $query->where('kategori', $request->kategori);
+        }
+
+        if ($request->has('sort')) {
+            if ($request->sort == 'terlama') {
+                $query->oldest('id_barang');
+            } elseif ($request->sort == 'nama_asc') {
+                $query->orderBy('nama_barang', 'asc');
+            } elseif ($request->sort == 'nama_desc') {
+                $query->orderBy('nama_barang', 'desc');
+            } else {
+                $query->latest('id_barang');
+            }
+        } else {
+            $query->latest('id_barang');
+        }
+
+        $barang = $query->paginate(10);
+        $kontrak = Kontrak::latest()->get();
         
-        return view('barang.index', compact('barang', 'kontrak', 'karyawan'));
+        return view('barang.index', compact('barang', 'kontrak'));
     }
+
     public function getByKontrak($id_kontrak)
     {
-        // Fetch only available items or all items based on your logic
-        $barang = \App\Models\Barang::where('id_kontrak', $id_kontrak)
-                    ->select('id_barang', 'nama_barang', 'kode_barcode') // Select only needed columns
+        $barang = Barang::where('id_kontrak', $id_kontrak)
+                    ->select('id_barang', 'nama_barang', 'kode_barcode')
                     ->orderBy('nama_barang')
                     ->get();
 
         return response()->json($barang);
     }
 
-    /**
-     * Show the form for creating a new resource.
-     */
-    public function create()
-    {
-        //
-    }
-
-    /**
-     * Store a newly created resource in storage.
-     */
     public function store(Request $request)
     {
-        $rules = [
-            'id_kontrak' => 'required|exists:m_kontrak,id_kontrak',
-            'kode_barcode' => 'required',
-            'nama_barang' => 'required',
-            'spesifikasi' => 'required',
-            'jumlah_barang' => 'required|numeric',
-            'lokasi_fisik' => 'nullable',
-            'id_karyawan_pemegang' => 'nullable|exists:m_karyawan,id_karyawan',
-        ];
-        $validatedData = Validator::make($request->all(), $rules);
-        if($validatedData->fails()){
-            return back()->withErrors($validatedData)->withInput();
+        $validated = $request->validate([
+            'id_kontrak'        => 'required|exists:m_kontrak,id_kontrak',
+            'kode_barcode'      => 'required|unique:m_barang,kode_barcode',
+            'nama_barang'       => 'required|string',
+            'kategori'          => 'required|in:Elektronik,Furnitur,Jaringan,Kendaraan,Peralatan Kantor,Lainnya',
+            'spesifikasi'       => 'required|string',
+            'jumlah_barang'     => 'required|numeric|min:1',
+            'status_penguasaan' => 'required|in:personal,lokasi',
+            'lokasi_fisik'      => 'required_if:status_penguasaan,lokasi|nullable|string',
+            'nip'               => 'required_if:status_penguasaan,personal|nullable|exists:m_karyawan,nip',
+            'foto_barang'       => 'nullable|image|mimes:jpg,jpeg,png|max:2048',
+        ]);
+
+        $imagePath = null;
+        if ($request->hasFile('foto_barang')) {
+            $imagePath = $request->file('foto_barang')->store('barang', 'public');
         }
-        if(!$request->has('id_karyawan_pemegang') && !$request->has('lokasi_fisik')){
-            return back()->with('error', 'Penempatan awal belum diisi')->withInput();
-        }
-        $barang = Barang::create($request->all());
-        if($request->id_karyawan_pemegang){
+
+        DB::transaction(function () use ($validated, $imagePath) {
+            
+            $idKaryawanPemegang = null;
+            if ($validated['status_penguasaan'] == 'personal' && !empty($validated['nip'])) {
+                $karyawan = Karyawan::where('nip', $validated['nip'])->first();
+                $idKaryawanPemegang = $karyawan->id_karyawan;
+            }
+
+            $barangData = [
+                'id_kontrak'    => $validated['id_kontrak'],
+                'kode_barcode'  => $validated['kode_barcode'],
+                'nama_barang'   => $validated['nama_barang'],
+                'kategori'      => $validated['kategori'],
+                'spesifikasi'   => $validated['spesifikasi'],
+                'jumlah_barang' => $validated['jumlah_barang'],
+                'foto_barang'   => $imagePath,
+            ];
+
+            if ($validated['status_penguasaan'] == 'personal') {
+                $barangData['id_karyawan_pemegang'] = $idKaryawanPemegang;
+                $barangData['lokasi_fisik'] = null;
+            } else {
+                $barangData['lokasi_fisik'] = $validated['lokasi_fisik'];
+                $barangData['id_karyawan_pemegang'] = null;
+            }
+
+            $barang = Barang::create($barangData);
+
             Mobilisasi::create([
-                'id_barang'=> $barang->id_barang,
-                'asal'=> '(Vendor)',
-                'id_penerima'=> $request->id_karyawan_pemegang,
-                'id_user_operator' => Auth::user()->id_user,
+                'id_barang'        => $barang->id_barang,
+                'asal'             => '(Vendor)',
+                'id_penerima'      => $idKaryawanPemegang,
+                'lokasi_tujuan'    => $validated['status_penguasaan'] == 'lokasi' ? $validated['lokasi_fisik'] : null,
+                'id_user_operator' => Auth::id(), 
             ]);
-        }
-        return redirect()->route('barang.index')->with('success','Data Barang berhasil ditambahkan.');
+
+            Kondisi::create([
+                'id_barang'        => $barang->id_barang,
+                'id_user_operator' => Auth::id(),
+                'status_kondisi'   => 'Baik',
+                'catatan'          => 'Registrasi Awal',
+            ]);
+        });
+
+        return redirect()->route('barang.index')->with('success', 'Data Barang berhasil ditambahkan.');
     }
 
-    /**
-     * Display the specified resource.
-     */
     public function show($id)
     {
-        $barang = Barang::with(['kontrak', 'karyawan', 'kondisi'])->findOrFail($id);
-        $barcode = new DNS2D(); 
-    
+        $barang = Barang::with([
+            'kontrak', 
+            'karyawan', 
+            'kondisi.operator.karyawan',
+            'latestKondisi.operator.karyawan',
+            'mobilisasi.penerima',
+            'mobilisasi.operator.karyawan'
+        ])->findOrFail($id);
+        
+        $barcode = new DNS2D();
         $barang->qr_html = $barcode->getBarcodeHTML((string)$barang->kode_barcode, 'QRCODE', 10, 10);
+        
         return response()->json($barang);
     }
 
-    /**
-     * Show the form for editing the specified resource.
-     */
-    public function edit(Barang $barang)
-    {
-        //
-    }
-
-    /**
-     * Update the specified resource in storage.
-     */
     public function update(Request $request, Barang $barang)
     {
-        $barang->update($request->all());
-        $barang->save();
-        return redirect()->route('barang.index')->with('success','Data barang berhasil diperbarui.');
+        $validated = $request->validate([
+            'id_kontrak'        => 'required|exists:m_kontrak,id_kontrak',
+            'nama_barang'       => 'required|string',
+            'kategori'          => 'required|in:Elektronik,Furnitur,Jaringan,Kendaraan,Peralatan Kantor,Lainnya',
+            'spesifikasi'       => 'required|string',
+            'jumlah_barang'     => 'required|numeric|min:1',
+            'status_penguasaan' => 'required|in:personal,lokasi',
+            'lokasi_fisik'      => 'required_if:status_penguasaan,lokasi|nullable|string',
+            'nip'               => 'required_if:status_penguasaan,personal|nullable|exists:m_karyawan,nip',
+            'kondisi'           => 'nullable|string',
+            'catatan'           => 'nullable|string',
+            'foto_barang'       => 'nullable|image|mimes:jpg,jpeg,png|max:2048',
+        ]);
+
+        $imagePath = $barang->foto_barang;
+        if ($request->hasFile('foto_barang')) {
+            if ($barang->foto_barang) {
+                Storage::disk('public')->delete($barang->foto_barang);
+            }
+            $imagePath = $request->file('foto_barang')->store('barang', 'public');
+        }
+
+        DB::transaction(function () use ($validated, $barang, $imagePath) {
+            $oldKaryawanId = $barang->getOriginal('id_karyawan_pemegang');
+            $oldLokasiFisik = $barang->getOriginal('lokasi_fisik');
+            $oldAsal = $oldKaryawanId ? ($barang->karyawan?->nama_karyawan ?? $oldKaryawanId) : $oldLokasiFisik;
+
+            $idKaryawanPemegang = null;
+            if ($validated['status_penguasaan'] == 'personal' && !empty($validated['nip'])) {
+                $karyawan = Karyawan::where('nip', $validated['nip'])->first();
+                $idKaryawanPemegang = $karyawan->id_karyawan;
+            }
+
+            $barang->fill([
+                'id_kontrak'    => $validated['id_kontrak'],
+                'nama_barang'   => $validated['nama_barang'],
+                'kategori'      => $validated['kategori'],
+                'jumlah_barang' => $validated['jumlah_barang'],
+                'spesifikasi'   => $validated['spesifikasi'],
+                'foto_barang'   => $imagePath,
+            ]);
+
+            if ($validated['status_penguasaan'] == 'personal') {
+                $barang->lokasi_fisik = null;
+                $barang->id_karyawan_pemegang = $idKaryawanPemegang;
+
+                if ($barang->isDirty('id_karyawan_pemegang') || $oldLokasiFisik !== null) {
+                    Mobilisasi::create([
+                        'id_barang'        => $barang->id_barang,
+                        'asal'             => $oldAsal ?? '-',
+                        'id_penerima'      => $idKaryawanPemegang,
+                        'id_user_operator' => Auth::id(),
+                    ]);
+                }
+            } elseif ($validated['status_penguasaan'] == 'lokasi') {
+                $barang->id_karyawan_pemegang = null;
+                $barang->lokasi_fisik = $validated['lokasi_fisik'];
+
+                if ($barang->isDirty('lokasi_fisik') || $oldKaryawanId !== null) {
+                    Mobilisasi::create([
+                        'id_barang'        => $barang->id_barang,
+                        'asal'             => $oldAsal ?? '-',
+                        'lokasi_tujuan'    => $validated['lokasi_fisik'],
+                        'id_user_operator' => Auth::id(),
+                    ]);
+                }
+            }
+
+            $barang->save();
+
+            if (!empty($validated['kondisi'])) {
+                Kondisi::create([
+                    'id_barang'        => $barang->id_barang,
+                    'id_user_operator' => Auth::id(),
+                    'status_kondisi'   => $validated['kondisi'],
+                    'catatan'          => $validated['catatan'] ?? null,
+                ]);
+            }
+        });
+
+        return redirect()->route('barang.index')->with('success', 'Data barang berhasil diperbarui.');
     }
 
-    /**
-     * Remove the specified resource from storage.
-     */
     public function destroy(Barang $barang)
     {
+        if ($barang->foto_barang) {
+            Storage::disk('public')->delete($barang->foto_barang);
+        }
+
         $barang->delete();
-        return redirect()->route('barang.index')->with('success','Data Barang berhasil dihapus.');
+        
+        return redirect()->route('barang.index')->with('success', 'Data Barang berhasil dihapus.');
     }
+
     public function printLabel($id)
     {
         $barang = Barang::with(['karyawan'])->findOrFail($id);
-        
         $barcode = new DNS2D();
         
-        // 1. Get the Base64 String (The text you saw on screen)
         $qrData = $barcode->getBarcodePNG((string)$barang->kode_barcode, 'QRCODE', 10, 10);
-        
-        // 2. Wrap it in an Image Tag so the browser renders it as a picture
-        // Note: getBarcodePNG returns Base64, so we DON'T need to base64_encode it again.
         $barang->qr_html = '<img src="data:image/png;base64,' . $qrData . '" style="width: 100px; height: 100px;">';
 
         return view('barang.print_single', compact('barang'));
@@ -132,17 +252,11 @@ class BarangController extends Controller
 
     public function printAll(Request $request)
     {
-        // 1. Fetch all items (eager load relation for performance)
         $barang = Barang::all();
-        
         $barcode = new DNS2D();
 
-        // 2. Loop through every item to generate its QR code
         foreach($barang as $item) {
-            // Get the Base64 String
             $qrData = $barcode->getBarcodePNG((string)$item->kode_barcode, 'QRCODE', 10, 10);
-            
-            // Create the HTML Image tag
             $item->qr_html = '<img src="data:image/png;base64,' . $qrData . '" style="width: 80px; height: 80px;">';
         }
 

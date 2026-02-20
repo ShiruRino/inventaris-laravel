@@ -17,9 +17,11 @@ return new class extends Migration
             $table->string('kode_barcode')->unique();
             $table->string('nama_barang');
             $table->text('spesifikasi');
+            $table->enum('kategori', ['Elektronik', 'Furnitur', 'Jaringan', 'Kendaraan', 'Peralatan Kantor', 'Lainnya'])->default('Lainnya');
             $table->integer('jumlah_barang');
             $table->string('lokasi_fisik')->nullable();
-            $table->foreignId('id_karyawan_pemegang')->nullable()->constrained('m_karyawan', "id_karyawan")->cascadeOnDelete();
+            $table->foreignId('id_karyawan_pemegang')->nullable()->constrained('m_karyawan', "id_karyawan")->nullOnDelete();
+            $table->string('foto_barang')->nullable();
             $table->timestamps();
         });
     }

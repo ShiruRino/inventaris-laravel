@@ -16,15 +16,19 @@ class Barang extends Model
         'jumlah_barang',
         'lokasi_fisik',
         'id_karyawan_pemegang',
+        'foto_barang',
     ];
     public function kontrak(){
         return $this->belongsTo(Kontrak::class, 'id_kontrak');
     }
     public function mobilisasi(){
-        return $this->belongsTo(Mobilisasi::class, 'id_barang');
+        return $this->hasMany(Mobilisasi::class, 'id_barang');
     }
     public function kondisi(){
-        return $this->hasMany(Kondisi::class, 'id_barang');
+        return $this->hasMany(Kondisi::class, 'id_barang')->latest();
+    }
+    public function latestKondisi(){
+        return $this->hasOne(Kondisi::class, 'id_barang')->latestOfMany('id_kondisi');
     }
     public function karyawan(){
         return $this->belongsTo(Karyawan::class, 'id_karyawan_pemegang');

@@ -7,14 +7,13 @@
         .avatar-tiny { width: 24px; height: 24px; object-fit: cover; border-radius: 50%; }
     </style>
 
-    {{-- HEADER & TOMBOL AKSI --}}
     <div class="d-flex justify-content-between align-items-center mb-4">
         <div>
             <h3>Riwayat Mobilisasi Aset</h3>
             <p class="text-muted">Lacak pergerakan aset (Handover Personal & Relokasi Ruangan).</p>
         </div>
         <div>
-            <a href="#" class="btn btn-outline-success me-2">
+            <a href="{{ route('mobilisasi.export', request()->query()) }}" class="btn btn-outline-success me-2">
                 <i class="bi bi-file-earmark-excel"></i> Export Excel
             </a>
             <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalManualMobilisasi">
@@ -23,11 +22,27 @@
         </div>
     </div>
 
+    @if(session('success'))
+        <div class="alert alert-success alert-dismissible fade show" role="alert">
+            <i class="bi bi-check-circle-fill me-2"></i> {{ session('success') }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    @endif
 
-    {{-- FILTER PENCARIAN --}}
+    @if($errors->any())
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            <ul class="mb-0">
+                @foreach($errors->all() as $error)
+                    <li>{{ $error }}</li>
+                @endforeach
+            </ul>
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    @endif
+
     <div class="card mb-4 border-0 shadow-sm">
         <div class="card-body">
-            <form action="" method="GET" class="row g-3 align-items-end">
+            <form action="{{ route('mobilisasi.index') }}" method="GET" class="row g-3 align-items-end">
                 <div class="col-md-3">
                     <label class="form-label">Dari Tanggal</label>
                     <input type="date" name="start_date" class="form-control" value="{{ request('start_date') }}">
@@ -40,14 +55,14 @@
                     <label class="form-label">Cari Aset / Nama Orang</label>
                     <input type="text" name="search" class="form-control" placeholder="Ketik nama barang atau karyawan..." value="{{ request('search') }}">
                 </div>
-                <div class="col-md-2">
+                <div class="col-md-2 d-flex gap-2">
                     <button type="submit" class="btn btn-secondary w-100"><i class="bi bi-search"></i> Filter</button>
+                    <a href="{{ route('mobilisasi.index') }}" class="btn btn-light border"><i class="bi bi-arrow-clockwise"></i></a>
                 </div>
             </form>
         </div>
     </div>
 
-    {{-- TABEL DATA --}}
     <div class="card shadow-sm border-0">
         <div class="card-body p-0">
             <div class="table-responsive">
@@ -60,7 +75,7 @@
                             <th>Dari (Asal)</th>
                             <th>Ke (Tujuan)</th>
                             <th>Operator</th>
-                            <th>Status</th>
+                            <th>Lampiran Bukti</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -75,24 +90,22 @@
                                     <small class="text-muted">{{ $m->barang->kode_barcode ?? 'No Code' }}</small>
                                 </td>
                                 <td>
-                                    @if($m->id_penerima)
-                                        <span class="badge bg-primary bg-opacity-10 text-primary border border-primary">
-                                            <i class="bi bi-person me-1"></i> Handover
-                                        </span>
-                                    @elseif ($m->asal == '(Vendor)' && $m->lokasi_tujuan !== null)
-                                        <span class="badge bg-success bg-opacity-10 text-warning border border-warning">
-                                            <i class="bi bi-building me-1"></i> Registrasi Awal
-                                        </span>
-                                        @else
-                                        <span class="badge bg-warning bg-opacity-10 text-warning border border-warning">
-                                            <i class="bi bi-building me-1"></i> Relokasi
-                                        </span>
+                                    @if($m->asal == "(Vendor)")
+                                    <span class="badge bg-success bg-opacity-10 text-success border border-success">
+                                        <i class="bi bi-building me-1"></i> Registrasi Awal
+                                    </span>
+                                    @elseif ($m->id_penerima)
+                                    <span class="badge bg-primary bg-opacity-10 text-primary border border-primary">
+                                        <i class="bi bi-person me-1"></i> Handover
+                                    </span>
+                                    @else
+                                    <span class="badge bg-warning bg-opacity-10 text-warning border border-warning">
+                                        <i class="bi bi-geo-alt me-1"></i> Relokasi
+                                    </span>
                                     @endif
                                 </td>
                                 <td>
-                                    @if ($m->asal == '(Vendor)')
                                     <div class="fst-italic">{{$m->asal}}</div>
-                                    @endif
                                 </td>
                                 <td>
                                     @if($m->id_penerima)
@@ -106,7 +119,7 @@
                                 </td>
                                 <td>
                                     @if($m->bukti_serah_terima)
-                                        <a href="{{ asset('storage/'.$m->bukti_serah_terima) }}" target="_blank" class="btn btn-sm btn-light" title="Lihat Bukti">
+                                        <a href="{{ asset('storage/'.$m->bukti_serah_terima) }}" target="_blank" class="btn btn-sm btn-light border" title="Lihat Bukti">
                                             <i class="bi bi-image text-primary"></i>
                                         </a>
                                     @else
@@ -127,14 +140,12 @@
             </div>
         </div>
         <div class="card-footer bg-white py-3">
-            {{-- Pagination Laravel --}}
-            <div class="d-flex justify-content-end">
-                {{ $mobilisasi->links('pagination::bootstrap-5') }}
+            <div class="d-flex justify-content-center">
+                {{ $mobilisasi->appends(request()->query())->links('pagination::bootstrap-5') }}
             </div>
         </div>
     </div>
 
-    {{-- MODAL INPUT MANUAL --}}
     <div class="modal fade" id="modalManualMobilisasi" tabindex="-1">
         <div class="modal-dialog">
             <div class="modal-content">
@@ -150,7 +161,6 @@
                             <i class="bi bi-info-circle me-1"></i> Pilih Kontrak dulu untuk memuat daftar barang.
                         </div>
 
-                        {{-- 1. INPUT KONTRAK (NEW) --}}
                         <div class="mb-3">
                             <label class="form-label">Pilih Kontrak / Vendor</label>
                             <select class="form-select" id="selectKontrak" onchange="fetchBarangByKontrak(this.value)">
@@ -163,9 +173,8 @@
                             </select>
                         </div>
 
-                        {{-- 2. INPUT BARANG (MODIFIED) --}}
                         <div class="mb-3">
-                            <label class="form-label">Pilih Barang</label>
+                            <label class="form-label">Pilih Barang <span class="text-danger">*</span></label>
                             <select class="form-select" name="id_barang" id="selectBarang" required disabled>
                                 <option value="">-- Menunggu Pilihan Kontrak --</option>
                             </select>
@@ -174,7 +183,6 @@
                             </div>
                         </div>
 
-                        {{-- 3. JENIS TRANSAKSI --}}
                         <div class="mb-3">
                             <label class="form-label d-block fw-bold">Jenis Transaksi</label>
                             <div class="form-check form-check-inline">
@@ -187,21 +195,17 @@
                             </div>
                         </div>
 
-                        {{-- Input Penerima (Karyawan) --}}
                         <div class="mb-3" id="fieldKaryawan">
-                            <label class="form-label">NIP Karyawan Penerima</label>
-                            <input required type="text" class="form-control" name="nip_penerima" id="inputNipPenerima" placeholder="Ketik NIP..." onkeyup="cariKaryawan(this.value)">
-                            
+                            <label class="form-label">NIP Karyawan Penerima <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" name="nip_penerima" id="inputNipPenerima" placeholder="Ketik NIP..." onkeyup="cariKaryawan(this.value)">
                             <div id="karyawanResult" class="form-text text-muted mt-1">Masukkan NIP untuk mencari.</div>
                         </div>
 
-                        {{-- Input Lokasi Tujuan --}}
                         <div class="mb-3 d-none" id="fieldLokasi">
-                            <label class="form-label">Lokasi Tujuan Fisik</label>
-                            <input required type="text" class="form-control" name="lokasi_tujuan" placeholder="Contoh: R. Meeting Lt. 2">
+                            <label class="form-label">Lokasi Tujuan Fisik <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" name="lokasi_tujuan" placeholder="Contoh: R. Meeting Lt. 2">
                         </div>
 
-                        {{-- Bukti Upload --}}
                         <div class="mb-3">
                             <label class="form-label">Bukti Serah Terima (Foto/Dokumen)</label>
                             <input type="file" class="form-control" name="bukti_serah_terima" accept="image/*,.pdf">
@@ -219,28 +223,24 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
     <script>
-        // We use a timeout so we don't spam the server on every single keystroke
         let typingTimer;
-        const doneTypingInterval = 500; // wait 500ms after user stops typing
+        const doneTypingInterval = 500; 
 
         function cariKaryawan(nip) {
             clearTimeout(typingTimer);
             const resultDiv = document.getElementById('karyawanResult');
 
-            // If input is empty or too short, reset
             if (nip.length < 3) {
                 resultDiv.innerHTML = 'Masukkan NIP untuk mencari.';
                 resultDiv.className = 'form-text text-muted mt-1';
                 return;
             }
 
-            // Show loading state
             resultDiv.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span> Mencari data...';
             resultDiv.className = 'form-text text-primary mt-1';
 
-            // Start timer
             typingTimer = setTimeout(() => {
-                fetch(`/karyawan/${nip}`)
+                fetch(`/api/karyawan/nip/${nip}`)
                     .then(response => response.json())
                     .then(data => {
                         if (data.status === 'success') {
@@ -257,12 +257,11 @@
                     });
             }, doneTypingInterval);
         }
-        // --- 1. LOGIKA FETCH BARANG VIA AJAX ---
+
         function fetchBarangByKontrak(kontrakId) {
             const selectBarang = document.getElementById('selectBarang');
             const loadingText = document.getElementById('loadingBarang');
 
-            // Reset dropdown barang
             selectBarang.innerHTML = '<option value="">-- Pilih Barang --</option>';
             selectBarang.disabled = true;
 
@@ -271,10 +270,8 @@
                 return;
             }
 
-            // Show loading
             loadingText.classList.remove('d-none');
 
-            // Fetch Data
             fetch(`/barang/kontrak/${kontrakId}`)
                 .then(response => response.json())
                 .then(data => {
@@ -285,7 +282,6 @@
                         selectBarang.innerHTML = '<option value="">-- Tidak ada barang di kontrak ini --</option>';
                     } else {
                         data.forEach(item => {
-                            // Create option element
                             const option = document.createElement('option');
                             option.value = item.id_barang;
                             option.textContent = `${item.kode_barcode} - ${item.nama_barang}`;
@@ -294,31 +290,34 @@
                     }
                 })
                 .catch(error => {
-                    console.error('Error:', error);
                     loadingText.classList.add('d-none');
                     alert('Gagal mengambil data barang.');
                 });
         }
 
-        // --- 2. LOGIKA TOGGLE KARYAWAN/LOKASI (Original Code) ---
         function toggleTujuan() {
             const isKaryawan = document.getElementById('optKaryawan').checked;
             const fieldKaryawan = document.getElementById('fieldKaryawan');
-            const selectKaryawan = fieldKaryawan.querySelector('select');
+            const inputKaryawan = document.getElementById('inputNipPenerima'); 
             
             const fieldLokasi = document.getElementById('fieldLokasi');
             const inputLokasi = fieldLokasi.querySelector('input');
 
             if (isKaryawan) {
                 fieldKaryawan.classList.remove('d-none');
-                selectKaryawan.required = true;
+                inputKaryawan.required = true;
+                
                 fieldLokasi.classList.add('d-none');
                 inputLokasi.required = false;
                 inputLokasi.value = ''; 
             } else {
                 fieldKaryawan.classList.add('d-none');
-                selectKaryawan.required = false;
-                selectKaryawan.value = ''; 
+                inputKaryawan.required = false;
+                inputKaryawan.value = ''; 
+                
+                document.getElementById('karyawanResult').innerHTML = 'Masukkan NIP untuk mencari.';
+                document.getElementById('karyawanResult').className = 'form-text text-muted mt-1';
+                
                 fieldLokasi.classList.remove('d-none');
                 inputLokasi.required = true;
             }

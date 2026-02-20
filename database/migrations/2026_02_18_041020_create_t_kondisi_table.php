@@ -17,7 +17,7 @@ return new class extends Migration
             $table->foreignId('id_user_operator')->constrained('m_user', 'id_user')->cascadeOnDelete();
             $table->enum('status_kondisi', ['Baik', 'Rusak Ringan', 'Rusak Berat', 'Hilang']);
             $table->text('catatan')->nullable();
-            $table->string('foto_kondisi');
+            $table->string('foto_kondisi')->nullable();
             $table->timestamps();
         });
     }

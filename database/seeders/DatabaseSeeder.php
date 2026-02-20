@@ -19,11 +19,18 @@ class DatabaseSeeder extends Seeder
     {
         // User::factory(10)->create();
 
-        $jb = Karyawan::create([
-            'nip' => '04832004',
+        Karyawan::create([
+            'nip' => '011107',
             'nama_karyawan' => 'Muhammad Jibran Al Fabian',
-            'divisi' => 'Website Developer',
+            'divisi' => 'IT',
             'jabatan' => 'Junior Website Developer',
+            'kontak' => '081937361264'
+        ]);
+        Karyawan::create([
+            'nip' => '160108',
+            'nama_karyawan' => 'Dewa Rakha Adhistanaya',
+            'divisi' => 'OPS',
+            'jabatan' => 'Staff Lapangan',
             'kontak' => '081937361264'
         ]);
         User::create([
@@ -31,6 +38,12 @@ class DatabaseSeeder extends Seeder
             'username' => 'jbfab',
             'password' => Hash::make('jb1234'),
             'role' => 'admin'
+        ]);
+        User::create([
+            'id_karyawan' => 2,
+            'username' => 'dwrak',
+            'password' => Hash::make('dw1234'),
+            'role' => 'lapangan'
         ]);
     }
 }

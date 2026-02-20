@@ -12,6 +12,24 @@
     </button>
 </div>
 
+@if(session('success'))
+    <div class="alert alert-success alert-dismissible fade show" role="alert">
+        <i class="bi bi-check-circle-fill me-2"></i> {{ session('success') }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+@endif
+
+@if($errors->any())
+    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+        <ul class="mb-0">
+            @foreach($errors->all() as $error)
+                <li>{{ $error }}</li>
+            @endforeach
+        </ul>
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+@endif
+
 <div class="alert alert-info d-flex align-items-center mb-4" role="alert">
     <i class="bi bi-info-circle-fill me-2"></i>
     <div>
@@ -19,7 +37,34 @@
     </div>
 </div>
 
-{{-- Table --}}
+<form action="{{ route('kontrak.index') }}" method="GET" class="mb-3">
+    <div class="row g-2">
+        <div class="col-md-4">
+            <input type="text" name="search" class="form-control" placeholder="Cari No. Kontrak atau Vendor..." value="{{ request('search') }}">
+        </div>
+        <div class="col-md-3">
+            <select name="tahun" class="form-select" onchange="this.form.submit()">
+                <option value="">Semua Tahun</option>
+                @foreach($tahunList as $t)
+                    <option value="{{ $t }}" {{ request('tahun') == $t ? 'selected' : '' }}>{{ $t }}</option>
+                @endforeach
+            </select>
+        </div>
+        <div class="col-md-3">
+            <select name="sort" class="form-select" onchange="this.form.submit()">
+                <option value="terbaru" {{ request('sort') == 'terbaru' ? 'selected' : '' }}>Terbaru Ditambahkan</option>
+                <option value="terlama" {{ request('sort') == 'terlama' ? 'selected' : '' }}>Terlama Ditambahkan</option>
+                <option value="vendor_asc" {{ request('sort') == 'vendor_asc' ? 'selected' : '' }}>Nama Vendor (A-Z)</option>
+                <option value="vendor_desc" {{ request('sort') == 'vendor_desc' ? 'selected' : '' }}>Nama Vendor (Z-A)</option>
+            </select>
+        </div>
+        <div class="col-md-2 d-flex gap-2">
+            <button type="submit" class="btn btn-primary w-100"><i class="bi bi-search"></i> Cari</button>
+            <a href="{{ route('kontrak.index') }}" class="btn btn-light border"><i class="bi bi-arrow-clockwise"></i></a>
+        </div>
+    </div>
+</form>
+
 <div class="card shadow-sm border-0">
     <div class="card-body p-0">
         <div class="table-responsive">
@@ -30,7 +75,7 @@
                         <th>Tahun</th>
                         <th>Nama Vendor</th>
                         <th>Pihak Pengada</th>
-                        <th>Keterangan</th>
+                        <th>Total Aset</th>
                         <th class="text-center">Aksi</th>
                     </tr>
                 </thead>
@@ -41,7 +86,13 @@
                         <td><span class="badge bg-primary">{{$i->tahun_kontrak}}</span></td>
                         <td>{{$i->nama_vendor}}</td>
                         <td>{{$i->pihak_pengada}}</td>
-                        <td class="text-muted small">{{Str::limit($i->keterangan, 50) ?? 'Tidak ada keterangan.'}}</td>
+                        <td>
+                            @php
+                                $count = $i->barang_count;
+                                $bg = $count > 0 ? 'bg-success' : 'bg-secondary';
+                            @endphp
+                            <span class="badge {{ $bg }}">{{ $count }} Barang</span>
+                        </td>
                         <td class="text-center">
                             <button class="btn btn-sm btn-outline-info" onclick="fetchDetail({{ $i->id_kontrak }})" title="Lihat Detail">
                                 <i class="bi bi-eye"></i>
@@ -50,8 +101,7 @@
                                 <i class="bi bi-pencil"></i>
                             </button>
                             
-                            {{-- Delete Form --}}
-                            <form action="{{ route('kontrak.destroy', $i->id_kontrak) }}" method="POST" class="d-inline" onsubmit="return confirmDelete(this)">
+                            <form action="{{ route('kontrak.destroy', $i->id_kontrak) }}" method="POST" class="d-inline" onsubmit="return confirmDelete(this, {{ $count }})">
                                 @csrf
                                 @method('DELETE')
                                 <button type="submit" class="btn btn-sm btn-outline-danger" title="Hapus">
@@ -71,13 +121,12 @@
                 </tbody>
             </table>
             <div class="d-flex justify-content-center mt-3">
-                {{$kontrak->links('pagination::bootstrap-5')}}
+                {{ $kontrak->appends(request()->query())->links('pagination::bootstrap-5') }}
             </div>
         </div>
     </div>
 </div>
 
-{{-- MODAL TAMBAH --}}
 <div class="modal fade" id="modalTambahKontrak" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content">
@@ -90,25 +139,25 @@
                 <div class="modal-body">
                     <div class="mb-3">
                         <label class="form-label">Nomor Kontrak / SPK <span class="text-danger">*</span></label>
-                        <input type="text" name="no_kontrak" class="form-control" placeholder="Contoh: SPK/IT/001/2024" required>
+                        <input type="text" name="no_kontrak" class="form-control" placeholder="Contoh: SPK/IT/001/2024" value="{{ old('no_kontrak') }}" required>
                     </div>
                     <div class="row mb-3">
                         <div class="col-md-8">
                             <label class="form-label">Nama Vendor <span class="text-danger">*</span></label>
-                            <input type="text" name="nama_vendor" class="form-control" placeholder="PT. Nama Vendor" required>
+                            <input type="text" name="nama_vendor" class="form-control" placeholder="PT. Nama Vendor" value="{{ old('nama_vendor') }}" required>
                         </div>
                         <div class="col-md-4">
                             <label class="form-label">Tahun</label>
-                            <input type="number" name="tahun_kontrak" class="form-control" value="{{ date('Y') }}" required>
+                            <input type="number" name="tahun_kontrak" class="form-control" value="{{ old('tahun_kontrak', date('Y')) }}" required>
                         </div>
                     </div>
                     <div class="mb-3">
                         <label class="form-label">Pihak Pengada</label>
-                        <input type="text" name="pihak_pengada" class="form-control" placeholder="Divisi IT / GA" required>
+                        <input type="text" name="pihak_pengada" class="form-control" placeholder="Divisi IT / GA" value="{{ old('pihak_pengada') }}" required>
                     </div>
                     <div class="mb-3">
                         <label class="form-label">Keterangan Proyek</label>
-                        <textarea name="keterangan" class="form-control" rows="3"></textarea>
+                        <textarea name="keterangan" class="form-control" rows="3">{{ old('keterangan') }}</textarea>
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -120,7 +169,6 @@
     </div>
 </div>
 
-{{-- MODAL EDIT --}}
 <div class="modal fade" id="modalEditKontrak" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content">
@@ -166,7 +214,6 @@
     </div>
 </div>
 
-{{-- MODAL DETAIL --}}
 <div class="modal fade" id="modalDetailKontrak" tabindex="-1">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
@@ -216,7 +263,6 @@
                             </tr>
                         </thead>
                         <tbody id="detail_list_barang">
-                            {{-- JS will populate this --}}
                         </tbody>
                     </table>
                 </div>
@@ -234,38 +280,40 @@
 <script>
     let currentKontrakId = null;
 
-    // --- 1. FETCH DETAIL ---
     function fetchDetail(id) {
         currentKontrakId = id;
         
-        // Show Loading State
         document.getElementById('detail_list_barang').innerHTML = '<tr><td colspan="3" class="text-center py-3"><div class="spinner-border spinner-border-sm text-primary"></div> Memuat data...</td></tr>';
         
-        // Show Modal
         new bootstrap.Modal(document.getElementById('modalDetailKontrak')).show();
 
-        fetch(`/kontrak/${id}`)
+        fetch(`/api/kontrak/${id}`)
             .then(res => res.json())
             .then(data => {
-                // Populate Header Info
                 document.getElementById('detail_no_header').innerText = data.no_kontrak;
                 document.getElementById('detail_vendor').innerText = data.nama_vendor;
                 document.getElementById('detail_tahun').innerText = data.tahun_kontrak;
                 document.getElementById('detail_pengada').innerText = data.pihak_pengada;
                 document.getElementById('detail_ket').innerText = data.keterangan || '-';
 
-                // Populate Table Items
                 const tbody = document.getElementById('detail_list_barang');
                 tbody.innerHTML = '';
 
                 if(data.barang && data.barang.length > 0) {
                     data.barang.forEach(item => {
-                        let badgeClass = item.kondisi === 'Baik' ? 'bg-success' : 'bg-warning';
+                        let kondisiText = item.latest_kondisi ? item.latest_kondisi.status_kondisi : 'Belum Dicek';
+                        let badgeClass = 'bg-secondary';
+                        
+                        if(kondisiText === 'Baik') badgeClass = 'bg-success';
+                        if(kondisiText === 'Rusak Ringan') badgeClass = 'bg-warning text-dark';
+                        if(kondisiText === 'Rusak Berat') badgeClass = 'bg-danger';
+                        if(kondisiText === 'Hilang') badgeClass = 'bg-dark';
+
                         tbody.innerHTML += `
                             <tr>
                                 <td class="fw-bold font-monospace">${item.kode_barcode}</td>
                                 <td>${item.nama_barang}</td>
-                                <td><span class="badge ${badgeClass}">${item.kondisi}</span></td>
+                                <td><span class="badge ${badgeClass}">${kondisiText}</span></td>
                             </tr>
                         `;
                     });
@@ -273,28 +321,23 @@
                     tbody.innerHTML = '<tr><td colspan="3" class="text-center text-muted fst-italic">Belum ada barang terdaftar di kontrak ini.</td></tr>';
                 }
                 
-                // Store ID for switch button
                 document.getElementById('edit_id_kontrak').value = data.id_kontrak;
             })
             .catch(err => {
-                console.error(err);
                 alert('Gagal mengambil data kontrak.');
             });
     }
 
-    // --- 2. FETCH EDIT ---
     function fetchEdit(id) {
         currentKontrakId = id;
 
-        // Close Detail modal if open
         const detailEl = document.getElementById('modalDetailKontrak');
         const detailModal = bootstrap.Modal.getInstance(detailEl);
         if(detailModal) detailModal.hide();
 
-        fetch(`/kontrak/${id}`)
+        fetch(`/api/kontrak/${id}`)
             .then(res => res.json())
             .then(data => {
-                // Fill Form
                 document.getElementById('edit_id_kontrak').value = data.id_kontrak;
                 document.getElementById('edit_no_kontrak').value = data.no_kontrak;
                 document.getElementById('edit_vendor').value = data.nama_vendor;
@@ -302,28 +345,27 @@
                 document.getElementById('edit_pengada').value = data.pihak_pengada;
                 document.getElementById('edit_ket').value = data.keterangan || '';
 
-                // Update Form Action URL
                 let baseUrl = "{{ route('kontrak.update', ':id') }}";
                 let updateUrl = baseUrl.replace(':id', data.id_kontrak);
                 document.getElementById('formEditKontrak').action = updateUrl;
 
-                // Show Modal
                 new bootstrap.Modal(document.getElementById('modalEditKontrak')).show();
             })
             .catch(err => {
-                console.error(err);
                 alert('Gagal mengambil data untuk edit.');
             });
     }
 
-    // --- 3. SWITCH MODAL ---
     function switchModalToEdit() {
         if(currentKontrakId) fetchEdit(currentKontrakId);
     }
 
-    // --- 4. CONFIRM DELETE ---
-    function confirmDelete(form) {
-        return confirm('Apakah Anda yakin ingin menghapus Kontrak ini? \n\nPERHATIAN: Pastikan tidak ada barang yang terhubung dengan kontrak ini sebelum menghapus.');
+    function confirmDelete(form, assetCount) {
+        if (assetCount > 0) {
+            alert(`GAGAL: Kontrak ini memiliki ${assetCount} aset yang terdaftar.\nHarap hapus atau pindahkan aset tersebut sebelum menghapus kontrak.`);
+            return false; 
+        }
+        return confirm('Apakah Anda yakin ingin menghapus Kontrak ini? Tindakan ini tidak dapat dibatalkan.');
     }
 </script>
 @endsection

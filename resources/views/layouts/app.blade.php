@@ -43,6 +43,9 @@
                     <a href="{{ route('mobilisasi.index') }}" class="nav-link-custom {{ request()->routeIs('mobilisasi.*') ? 'active' : '' }}"> 
                         <i class="bi bi-arrow-left-right me-2"></i> Mobilisasi
                     </a>
+                    <a href="{{ route('user.index') }}" class="nav-link-custom {{ request()->routeIs('user.*') ? 'active' : '' }}"> 
+                        <i class="bi bi-people me-2"></i> User
+                    </a>
                     {{-- Add other links here... --}}
                 </div>
             </div>

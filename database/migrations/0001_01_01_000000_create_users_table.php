@@ -23,8 +23,8 @@ return new class extends Migration
         });
         Schema::create('m_user', function (Blueprint $table) {
             $table->id('id_user');
-            $table->foreignId('id_karyawan')->constrained('m_karyawan', 'id_karyawan')->cascadeOnDelete();
-            $table->string('username');
+            $table->foreignId('id_karyawan')->unique()->constrained('m_karyawan', 'id_karyawan')->cascadeOnDelete();
+            $table->string('username')->unique();
             $table->string('password');
             $table->enum('role', ['admin', 'lapangan']);
             $table->rememberToken();
@@ -52,8 +52,8 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('karyawan');
-        Schema::dropIfExists('users');
+        Schema::dropIfExists('m_karyawan');
+        Schema::dropIfExists('m_user');
         Schema::dropIfExists('password_reset_tokens');
         Schema::dropIfExists('sessions');
     }

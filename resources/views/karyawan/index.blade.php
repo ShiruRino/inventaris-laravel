@@ -14,7 +14,24 @@
     </button>
 </div>
 
-{{-- Stats Card --}}
+@if(session('success'))
+    <div class="alert alert-success alert-dismissible fade show" role="alert">
+        <i class="bi bi-check-circle-fill me-2"></i> {{ session('success') }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+@endif
+
+@if($errors->any())
+    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+        <ul class="mb-0">
+            @foreach($errors->all() as $error)
+                <li>{{ $error }}</li>
+            @endforeach
+        </ul>
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+@endif
+
 <div class="row mb-4">
     <div class="col-md-4">
         <div class="card border-0 shadow-sm p-3">
@@ -24,14 +41,42 @@
                 </div>
                 <div>
                     <h6 class="text-muted mb-0">Total Pegawai</h6>
-                    <h4 class="mb-0">{{ $karyawan->count() }} Orang</h4>
+                    <h4 class="mb-0">{{ $karyawan->total() }} Orang</h4>
                 </div>
             </div>
         </div>
     </div>
 </div>
 
-{{-- Table --}}
+<form action="{{ route('karyawan.index') }}" method="GET" class="mb-3">
+    <div class="row g-2">
+        <div class="col-md-4">
+            <input type="text" name="search" class="form-control" placeholder="Cari NIP atau Nama..." value="{{ request('search') }}">
+        </div>
+        <div class="col-md-3">
+            <select name="divisi" class="form-select" onchange="this.form.submit()">
+                <option value="">Semua Departemen</option>
+                <option value="IT" {{ request('divisi') == 'IT' ? 'selected' : '' }}>Teknologi Informasi</option>
+                <option value="HR" {{ request('divisi') == 'HR' ? 'selected' : '' }}>Human Resource</option>
+                <option value="GA" {{ request('divisi') == 'GA' ? 'selected' : '' }}>General Affair</option>
+                <option value="FIN" {{ request('divisi') == 'FIN' ? 'selected' : '' }}>Finance</option>
+                <option value="OPS" {{ request('divisi') == 'OPS' ? 'selected' : '' }}>Operasional</option>
+            </select>
+        </div>
+        <div class="col-md-3">
+            <select name="sort" class="form-select" onchange="this.form.submit()">
+                <option value="terbaru" {{ request('sort') == 'terbaru' ? 'selected' : '' }}>Terbaru Ditambahkan</option>
+                <option value="nama_asc" {{ request('sort') == 'nama_asc' ? 'selected' : '' }}>Nama (A-Z)</option>
+                <option value="nama_desc" {{ request('sort') == 'nama_desc' ? 'selected' : '' }}>Nama (Z-A)</option>
+            </select>
+        </div>
+        <div class="col-md-2 d-flex gap-2">
+            <button type="submit" class="btn btn-primary w-100"><i class="bi bi-search"></i> Cari</button>
+            <a href="{{ route('karyawan.index') }}" class="btn btn-light border"><i class="bi bi-arrow-clockwise"></i></a>
+        </div>
+    </div>
+</form>
+
 <div class="card shadow-sm border-0">
     <div class="card-body p-0">
         <div class="table-responsive">
@@ -58,8 +103,7 @@
                             <td>{{ $i->kontak ?? '-' }}</td>
                             <td>
                                 @php
-                                    // Make sure to use withCount in controller for performance
-                                    $count = $i->barang_count ?? $i->barang->count();
+                                    $count = $i->barang_count;
                                     $bg = $count > 0 ? 'bg-primary' : 'bg-secondary';
                                     if($count > 2) $bg = 'bg-warning text-dark';
                                 @endphp
@@ -73,7 +117,6 @@
                                     <i class="bi bi-pencil"></i>
                                 </button>
                                 
-                                {{-- Delete Form Wrapper --}}
                                 <form action="{{route('karyawan.destroy', $i->id_karyawan)}}" method="POST" class="d-inline" onsubmit="return confirmDelete(this, {{ $count }})">
                                     @csrf
                                     @method('DELETE')
@@ -94,13 +137,12 @@
                 </tbody>
             </table>
             <div class="d-flex justify-content-center mt-3">
-                {{$karyawan->links('pagination::bootstrap-5')}}
+                {{ $karyawan->appends(request()->query())->links('pagination::bootstrap-5') }}
             </div>
         </div>
     </div>
 </div>
 
-{{-- MODAL TAMBAH --}}
 <div class="modal fade" id="modalTambahKaryawan" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content">
@@ -114,30 +156,30 @@
                     <div class="row mb-3">
                         <div class="col-md-6">
                             <label class="form-label">NIP</label>
-                            <input type="text" placeholder="Contoh: 2024001" name="nip" class="form-control" required>
+                            <input type="text" placeholder="Contoh: 2024001" name="nip" class="form-control" value="{{old('nip')}}" required>
                         </div>
                         <div class="col-md-6">
                             <label class="form-label">Kontak (No. Telepon / E-mail)</label>
-                            <input type="text" placeholder="Contoh: 081937361264" name="kontak" class="form-control">
+                            <input type="text" placeholder="Contoh: 081937361264" name="kontak" class="form-control" value="{{old('kontak')}}">
                         </div>
                     </div>
                     <div class="mb-3">
                         <label class="form-label">Nama Lengkap</label>
-                        <input type="text" placeholder="Contoh: Budi Santoso" name="nama_karyawan" class="form-control" required>
+                        <input type="text" placeholder="Contoh: Budi Santoso" name="nama_karyawan" class="form-control" value="{{old('nama_karyawan')}}" required>
                     </div>
                     <div class="mb-3">
                         <label class="form-label">Jabatan</label>
-                        <input type="text" placeholder="Contoh: Staff Lapangan" name="jabatan" class="form-control" required>
+                        <input type="text" placeholder="Contoh: Staff Lapangan" name="jabatan" class="form-control" value="{{old('jabatan')}}" required>
                     </div>
                     <div class="mb-3">
                         <label class="form-label">Departemen</label>
                         <select name="divisi" class="form-select" required>
                             <option value="">Pilih Departemen...</option>
-                            <option value="IT">Teknologi Informasi</option>
-                            <option value="HR">Human Resource</option>
-                            <option value="GA">General Affair</option>
-                            <option value="FIN">Finance</option>
-                            <option value="OPS">Operasional</option>
+                            <option value="IT" {{ old('divisi') == 'IT' ? 'selected' : '' }}>Teknologi Informasi</option>
+                            <option value="HR" {{ old('divisi') == 'HR' ? 'selected' : '' }}>Human Resource</option>
+                            <option value="GA" {{ old('divisi') == 'GA' ? 'selected' : '' }}>General Affair</option>
+                            <option value="FIN" {{ old('divisi') == 'FIN' ? 'selected' : '' }}>Finance</option>
+                            <option value="OPS" {{ old('divisi') == 'OPS' ? 'selected' : '' }}>Operasional</option>
                         </select>
                     </div>
                 </div>
@@ -150,7 +192,6 @@
     </div>
 </div>
 
-{{-- MODAL EDIT --}}
 <div class="modal fade" id="modalEditKaryawan" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content">
@@ -162,26 +203,25 @@
                 @csrf
                 @method('PUT')
                 <div class="modal-body">
-                    {{-- ID Hidden --}}
                     <input type="hidden" id="edit_id_karyawan">
 
                     <div class="row mb-3">
                         <div class="col-md-6">
                             <label class="form-label">NIP (Readonly)</label>
-                            <input type="text" placeholder="Contoh: 2024001" name="nip" class="form-control bg-light" id="edit_nip" readonly>
+                            <input type="text" name="nip" class="form-control bg-light" id="edit_nip" readonly>
                         </div>
                         <div class="col-md-6">
                             <label class="form-label">Kontak (No. Telepon / E-mail)</label>
-                            <input type="text" placeholder="Contoh: 081937361264" type="Masukkan" name="kontak" class="form-control" id="edit_telp" placeholder="Masukkan nomor telepon/email">
+                            <input type="text" name="kontak" class="form-control" id="edit_telp">
                         </div>
                     </div>
                     <div class="mb-3">
                         <label class="form-label">Nama Lengkap</label>
-                        <input type="text" placeholder="Contoh: Budi Santoso" name="nama_karyawan" class="form-control" id="edit_nama" required>
+                        <input type="text" name="nama_karyawan" class="form-control" id="edit_nama" required>
                     </div>
                     <div class="mb-3">
                         <label class="form-label">Jabatan</label>
-                        <input type="text" placeholder="Contoh: Staff Lapangan" name="jabatan" class="form-control" id="edit_jabatan" required>
+                        <input type="text" name="jabatan" class="form-control" id="edit_jabatan" required>
                     </div>
                     <div class="mb-3">
                         <label class="form-label">Departemen</label>
@@ -203,7 +243,6 @@
     </div>
 </div>
 
-{{-- MODAL DETAIL --}}
 <div class="modal fade" id="modalDetailKaryawan" tabindex="-1">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
@@ -242,7 +281,6 @@
                             </tr>
                         </thead>
                         <tbody id="list_aset_karyawan">
-                            {{-- JS will populate this --}}
                         </tbody>
                     </table>
                 </div>
@@ -255,56 +293,52 @@
     </div>
 </div>
 
-{{-- JAVASCRIPT --}}
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
 <script>
     let currentEmployeeId = null;
 
-    // --- 1. FETCH DETAIL ---
     function fetchDetail(id) {
         currentEmployeeId = id;
         
-        // UI: Show loading state
         document.getElementById('list_aset_karyawan').innerHTML = '<tr><td colspan="4" class="text-center py-3"><div class="spinner-border text-primary" role="status"></div><div class="mt-2">Memuat data...</div></td></tr>';
         document.getElementById('detail_header_nama').innerText = "Loading...";
         
         const modal = new bootstrap.Modal(document.getElementById('modalDetailKaryawan'));
         modal.show();
 
-        // Using standard Resource Route URL: /karyawan/{id}
-        fetch(`/karyawan/${id}`)
+        fetch(`/api/karyawan/id/${id}`)
             .then(response => {
                 if (!response.ok) throw new Error("Gagal mengambil data");
                 return response.json();
             })
             .then(data => {
-                // Populate Header
                 document.getElementById('detail_header_nama').innerText = data.nama_karyawan;
                 document.getElementById('detail_header_jabatan').innerText = data.jabatan;
                 document.getElementById('detail_nip').innerText = data.nip;
                 document.getElementById('detail_dept').innerText = data.divisi;
-                document.getElementById('detail_telp').innerText = data.no_telepon || '-';
+                document.getElementById('detail_telp').innerText = data.kontak || '-';
 
-                // Populate Table
                 const tbody = document.getElementById('list_aset_karyawan');
                 tbody.innerHTML = ''; 
 
                 if (data.barang && data.barang.length > 0) {
                     data.barang.forEach(asset => {
-                        // Logic for badge color based on condition
+                        let kondisiText = asset.latest_kondisi ? asset.latest_kondisi.status_kondisi : 'Belum Dicek';
                         let badgeClass = 'bg-secondary';
-                        if(asset.kondisi === 'Baik') badgeClass = 'bg-success';
-                        if(asset.kondisi === 'Rusak') badgeClass = 'bg-danger';
                         
-                        // Format Date
+                        if(kondisiText === 'Baik') badgeClass = 'bg-success';
+                        if(kondisiText === 'Rusak Ringan') badgeClass = 'bg-warning text-dark';
+                        if(kondisiText === 'Rusak Berat') badgeClass = 'bg-danger';
+                        if(kondisiText === 'Hilang') badgeClass = 'bg-dark';
+                        
                         let dateReceived = asset.created_at ? new Date(asset.created_at).toLocaleDateString('id-ID') : '-';
 
                         tbody.innerHTML += `
                             <tr>
                                 <td class="font-monospace fw-bold">${asset.kode_barcode}</td>
                                 <td>${asset.nama_barang}</td>
-                                <td><span class="badge ${badgeClass}">${asset.kondisi || 'N/A'}</span></td>
+                                <td><span class="badge ${badgeClass}">${kondisiText}</span></td>
                                 <td>${dateReceived}</td>
                             </tr>
                         `;
@@ -314,53 +348,43 @@
                 }
             })
             .catch(err => {
-                console.error(err);
                 alert("Terjadi kesalahan saat mengambil data karyawan.");
             });
     }
 
-    // --- 2. FETCH EDIT ---
     function fetchEdit(id) {
         currentEmployeeId = id;
 
-        // Close Detail Modal if open
         const detailEl = document.getElementById('modalDetailKaryawan');
         const detailModal = bootstrap.Modal.getInstance(detailEl);
         if (detailModal) detailModal.hide();
 
-        // Using standard Resource Route URL: /karyawan/{id}
-        fetch(`/karyawan/${id}`)
+        fetch(`/api/karyawan/id/${id}`)
             .then(res => res.json())
             .then(data => {
-                // Fill Inputs
                 document.getElementById('edit_id_karyawan').value = data.id_karyawan; 
                 document.getElementById('edit_nip').value = data.nip;
                 document.getElementById('edit_nama').value = data.nama_karyawan;
                 document.getElementById('edit_jabatan').value = data.jabatan;
-                document.getElementById('edit_telp').value = data.no_telepon || '';
+                document.getElementById('edit_telp').value = data.kontak || '';
                 document.getElementById('edit_dept').value = data.divisi;
 
-                // Dynamic Route Handling for Update using Laravel Route helper + JS replace
                 let baseUrl = "{{ route('karyawan.update', ':id') }}";
                 let updateUrl = baseUrl.replace(':id', data.id_karyawan);
                 
                 document.getElementById('formEditKaryawan').action = updateUrl;
 
-                // Show Modal
                 new bootstrap.Modal(document.getElementById('modalEditKaryawan')).show();
             })
             .catch(error => {
-                console.error('Error:', error);
                 alert('Gagal memuat data untuk edit.');
             });
     }
 
-    // --- 3. SWITCH MODAL ---
     function switchModalToEdit() {
         if(currentEmployeeId) fetchEdit(currentEmployeeId);
     }
 
-    // --- 4. CONFIRM DELETE ---
     function confirmDelete(form, assetCount) {
         if (assetCount > 0) {
             alert(`GAGAL: Karyawan ini masih memegang ${assetCount} aset.\nHarap lakukan pengembalian aset sebelum menghapus data karyawan.`);
