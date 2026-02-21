@@ -102,7 +102,18 @@
                                         <span class="badge bg-info text-dark">Petugas Lapangan</span>
                                     @endif
                                 </td>
-                                <td><span class="badge bg-success rounded-pill">Aktif</span></td>
+                                <td>
+                                    @if($user->is_online)
+                                        <span class="badge bg-success rounded-pill">
+                                            <i class="bi bi-circle-fill me-1" style="font-size: 0.5rem;"></i> Online
+                                        </span>
+                                    @else
+                                        <span class="badge bg-secondary rounded-pill">Offline</span>
+                                        <div class="text-muted" style="font-size: 0.7rem;">
+                                            {{ $user->last_activity_at ? $user->last_activity_at->diffForHumans() : 'Belum pernah login' }}
+                                        </div>
+                                    @endif
+                                </td>
                                 <td class="text-center">
                                     <button class="btn btn-sm btn-outline-info" onclick="showDetail({{ $user->id_user }})" title="Detail Activity"><i class="bi bi-eye"></i></button>
                                     <button class="btn btn-sm btn-outline-warning" onclick="showEdit({{ $user->id_user }})" title="Edit Akses"><i class="bi bi-pencil-square"></i></button>
@@ -282,10 +293,22 @@
                     </div>
 
                     <div class="col-md-7">
-                        <h6 class="fw-bold mb-3"><i class="bi bi-shield-check me-2"></i>Informasi Keamanan</h6>
+                        <h6 class="fw-bold mb-3"><i class="bi bi-clock-history me-2"></i>Aktivitas Terakhir</h6>
+                        <div class="list-group list-group-flush border rounded mb-3" id="detail_log_aktivitas">
+                            </div>
+
+                        <h6 class="fw-bold mb-3"><i class="bi bi-shield-check me-2"></i>Keamanan & Login</h6>
                         <div class="alert alert-light border small p-3">
-                            <p class="mb-1">Akun ini dikelola oleh sistem. Pastikan karyawan menjaga kerahasiaan password.</p>
-                            <p class="mb-0 text-muted">Akses: <span id="detail_role_text" class="fw-bold"></span></p>
+                            <div class="d-flex justify-content-between mb-1">
+                                <span class="text-muted">Login Terakhir:</span>
+                                <span id="detail_last_login" class="fw-bold">-</span>
+                            </div>
+                            <div class="d-flex justify-content-between mb-1">
+                                <span class="text-muted">Aktivitas Terakhir:</span>
+                                <span id="detail_last_activity" class="fw-bold">-</span>
+                            </div>
+                            <hr class="my-2">
+                            <p class="mb-0 text-muted">Akses: <span id="detail_role_text" class="fw-bold text-dark"></span></p>
                         </div>
                     </div>
                 </div>
@@ -333,10 +356,31 @@
             document.getElementById('detail_divisi').innerText = data.karyawan ? data.karyawan.divisi : '-';
             document.getElementById('detail_role_text').innerText = levelText;
 
-            document.getElementById('detail_id_user_temp').value = id;
+            document.getElementById('detail_last_login').innerText = data.last_login_at ? new Date(data.last_login_at).toLocaleString('id-ID') : 'Belum Pernah';
+            document.getElementById('detail_last_activity').innerText = data.last_activity_at ? new Date(data.last_activity_at).toLocaleString('id-ID') : 'Tidak Ada';
 
+            const logContainer = document.getElementById('detail_log_aktivitas');
+            logContainer.innerHTML = '';
+
+            if (data.riwayat_aktivitas && data.riwayat_aktivitas.length > 0) {
+                data.riwayat_aktivitas.forEach(log => {
+                    const logItem = `
+                        <div class="list-group-item p-2">
+                            <div class="d-flex justify-content-between">
+                                <small class="fw-bold text-dark">${log.aktivitas || 'Melakukan aksi'}</small>
+                                <small class="text-muted" style="font-size: 0.7rem;">${new Date(log.created_at).toLocaleTimeString('id-ID')}</small>
+                            </div>
+                        </div>`;
+                    logContainer.innerHTML += logItem;
+                });
+            } else {
+                logContainer.innerHTML = '<div class="list-group-item text-center text-muted small py-3">Tidak ada riwayat aktivitas terbaru</div>';
+            }
+
+            document.getElementById('detail_id_user_temp').value = id;
             new bootstrap.Modal(document.getElementById('modalDetailUser')).show();
         } catch (error) {
+            console.error(error);
             alert('Gagal mengambil data detail user.');
         }
     }

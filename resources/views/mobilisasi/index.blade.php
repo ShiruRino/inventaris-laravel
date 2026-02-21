@@ -16,6 +16,9 @@
             <a href="{{ route('mobilisasi.export', request()->query()) }}" class="btn btn-outline-success me-2">
                 <i class="bi bi-file-earmark-excel"></i> Export Excel
             </a>
+            <a href="{{ route('mobilisasi.exportPdf', request()->query()) }}" class="btn btn-outline-danger me-2">
+                <i class="bi bi-file-earmark-pdf"></i> Export PDF
+            </a>
             <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modalManualMobilisasi">
                 <i class="bi bi-arrow-left-right"></i> Input Perpindahan
             </button>
@@ -41,6 +44,24 @@
     @endif
 
     <div class="card mb-4 border-0 shadow-sm">
+        @if($barangPending->count() > 0)
+        <div class="alert alert-warning border shadow-sm mb-4">
+            <h6 class="alert-heading fw-bold mb-2"><i class="bi bi-exclamation-circle-fill me-1"></i> {{ $barangPending->count() }} Aset Menunggu Serah Terima (Pending)</h6>
+            <p class="mb-0 small text-dark">Aset di bawah ini masih berada di Vendor dan belum dialokasikan ke Pihak Pengada/Karyawan:</p>
+            <div class="d-flex flex-wrap gap-2 mt-2">
+                @foreach($barangPending as $pending)
+                    <span class="badge bg-light text-dark border">
+                        <strong>{{ $pending->kode_barcode }}</strong> - {{ $pending->nama_barang }}
+                    </span>
+                @endforeach
+            </div>
+            <div class="mt-3">
+                <button class="btn btn-sm btn-warning" data-bs-toggle="modal" data-bs-target="#modalManualMobilisasi">
+                    Lakukan Serah Terima Sekarang
+                </button>
+            </div>
+        </div>
+        @endif
         <div class="card-body">
             <form action="{{ route('mobilisasi.index') }}" method="GET" class="row g-3 align-items-end">
                 <div class="col-md-3">
@@ -174,9 +195,9 @@
                         </div>
 
                         <div class="mb-3">
-                            <label class="form-label">Pilih Barang <span class="text-danger">*</span></label>
-                            <select class="form-select" name="id_barang" id="selectBarang" required disabled>
-                                <option value="">-- Menunggu Pilihan Kontrak --</option>
+                            <label class="form-label">Pilih Barang (Tahan CTRL/CMD untuk pilih banyak) <span class="text-danger">*</span></label>
+                            <select class="form-select" name="id_barang[]" id="selectBarang" multiple required disabled style="min-height: 150px;">
+                                <option value="" disabled>-- Menunggu Pilihan Kontrak --</option>
                             </select>
                             <div id="loadingBarang" class="form-text text-primary d-none">
                                 <span class="spinner-border spinner-border-sm" role="status"></span> Memuat data barang...
@@ -262,11 +283,11 @@
             const selectBarang = document.getElementById('selectBarang');
             const loadingText = document.getElementById('loadingBarang');
 
-            selectBarang.innerHTML = '<option value="">-- Pilih Barang --</option>';
+            selectBarang.innerHTML = '';
             selectBarang.disabled = true;
 
             if (!kontrakId) {
-                selectBarang.innerHTML = '<option value="">-- Menunggu Pilihan Kontrak --</option>';
+                selectBarang.innerHTML = '<option value="" disabled>-- Menunggu Pilihan Kontrak --</option>';
                 return;
             }
 
@@ -279,7 +300,8 @@
                     selectBarang.disabled = false;
 
                     if (data.length === 0) {
-                        selectBarang.innerHTML = '<option value="">-- Tidak ada barang di kontrak ini --</option>';
+                        selectBarang.innerHTML = '<option value="" disabled>-- Tidak ada barang di kontrak ini --</option>';
+                        selectBarang.disabled = true;
                     } else {
                         data.forEach(item => {
                             const option = document.createElement('option');

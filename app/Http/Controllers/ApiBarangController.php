@@ -1,16 +1,21 @@
 <?php
+
 namespace App\Http\Controllers;
 
 use App\Models\Barang;
 use App\Models\Karyawan;
 use App\Models\Kondisi;
+use App\Models\Kontrak;
 use App\Models\Mobilisasi;
+use App\Traits\LogAktivitasTrait;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 
 class ApiBarangController extends Controller
 {
+    use LogAktivitasTrait;
+
     public function index(Request $request)
     {
         $totalAset = Barang::count();
@@ -19,9 +24,35 @@ class ApiBarangController extends Controller
             $query->whereIn('status_kondisi', ['Rusak Ringan', 'Rusak Berat']);
         })->count();
 
+        $query = Barang::with(['karyawan', 'latestKondisi']);
+
+        if ($request->has('search') && $request->search != '') {
+            $query->where(function($q) use ($request) {
+                $q->where('nama_barang', 'like', '%' . $request->search . '%')
+                  ->orWhere('kode_barcode', 'like', '%' . $request->search . '%');
+            });
+        }
+
+        if ($request->has('kategori') && $request->kategori != '') {
+            $query->where('kategori', $request->kategori);
+        }
+
+        if ($request->has('sort')) {
+            if ($request->sort == 'terlama') {
+                $query->oldest('id_barang');
+            } elseif ($request->sort == 'nama_asc') {
+                $query->orderBy('nama_barang', 'asc');
+            } elseif ($request->sort == 'nama_desc') {
+                $query->orderBy('nama_barang', 'desc');
+            } else {
+                $query->latest('id_barang');
+            }
+        } else {
+            $query->latest('id_barang');
+        }
+
         $perPage = $request->input('per_page', 10);
-        
-        $barang = Barang::with(['karyawan', 'latestKondisi'])->latest()->paginate($perPage);
+        $barang = $query->paginate($perPage);
         
         return response()->json([
             'statistik' => [
@@ -35,23 +66,40 @@ class ApiBarangController extends Controller
     public function store(Request $request)
     {
         $validatedData = $request->validate([
-            'id_kontrak'        => 'required|exists:m_kontrak,id_kontrak',
-            'kode_barcode'      => 'required|unique:m_barang,kode_barcode',
-            'nama_barang'       => 'required|string',
-            'spesifikasi'       => 'required|string',
-            'jumlah_barang'     => 'required|numeric|min:1',
-            'status_penguasaan' => 'required|in:personal,lokasi',
-            'lokasi_fisik'      => 'required_if:status_penguasaan,lokasi|nullable|string',
-            'nip'               => 'required_if:status_penguasaan,personal|nullable|exists:m_karyawan,nip',
-            'foto_barang'       => 'nullable|image|mimes:jpg,jpeg,png|max:2048',
+            'id_kontrak'           => 'required|exists:m_kontrak,id_kontrak',
+            'nama_barang'          => 'required|string',
+            'kategori'             => 'required|in:Elektronik,Furnitur,Jaringan,Kendaraan,Peralatan Kantor,Lainnya',
+            'spesifikasi'          => 'required|string',
+            'jumlah_barang'        => 'required|numeric|min:1',
+            'status_penguasaan'    => 'required|in:personal,lokasi',
+            'lokasi_fisik'         => 'required_if:status_penguasaan,lokasi|nullable|string',
+            'nip'                  => 'required_if:status_penguasaan,personal|nullable|exists:m_karyawan,nip',
+            'dokumentasi_barang'   => 'nullable|array',
+            'dokumentasi_barang.*' => 'file|mimes:jpg,jpeg,png,pdf|max:2048',
         ]);
 
-        $imagePath = null;
-        if ($request->hasFile('foto_barang')) {
-            $imagePath = $request->file('foto_barang')->store('barang', 'public');
+        $dokumentasiPaths = null;
+        if ($request->hasFile('dokumentasi_barang')) {
+            $dokumentasiPaths = [];
+            foreach ($request->file('dokumentasi_barang') as $file) {
+                $dokumentasiPaths[] = $file->store('dokumentasi', 'public');
+            }
         }
 
-        $barang = DB::transaction(function () use ($request, $validatedData, $imagePath) {
+        $kontrak = Kontrak::findOrFail($validatedData['id_kontrak']);
+
+        $prefixes = [
+            'Elektronik'       => 'EL',
+            'Furnitur'         => 'FR',
+            'Jaringan'         => 'JR',
+            'Kendaraan'        => 'KD',
+            'Peralatan Kantor' => 'PK',
+            'Lainnya'          => 'LN',
+        ];
+        
+        $prefix = $prefixes[$validatedData['kategori']] ?? 'LN';
+
+        $barangs = DB::transaction(function () use ($request, $validatedData, $dokumentasiPaths, $kontrak, $prefix) {
             
             $idKaryawanPemegang = null;
             if ($validatedData['status_penguasaan'] == 'personal' && !empty($validatedData['nip'])) {
@@ -59,47 +107,62 @@ class ApiBarangController extends Controller
                 $idKaryawanPemegang = $karyawan->id_karyawan;
             }
 
-            $barangData = [
-                'id_kontrak'    => $validatedData['id_kontrak'],
-                'kode_barcode'  => $validatedData['kode_barcode'],
-                'nama_barang'   => $validatedData['nama_barang'],
-                'spesifikasi'   => $validatedData['spesifikasi'],
-                'jumlah_barang' => $validatedData['jumlah_barang'],
-                'foto_barang'   => $imagePath,
-            ];
+            $baseNumber = Barang::max('id_barang') ?? 0;
+            $createdBarangs = [];
 
-            if ($validatedData['status_penguasaan'] == 'personal') {
-                $barangData['id_karyawan_pemegang'] = $idKaryawanPemegang;
-                $barangData['lokasi_fisik'] = null;
-            } else {
-                $barangData['lokasi_fisik'] = $validatedData['lokasi_fisik'];
-                $barangData['id_karyawan_pemegang'] = null;
+            for ($i = 1; $i <= $validatedData['jumlah_barang']; $i++) {
+                $currentCount = $baseNumber + $i;
+                $kodeBarcode = sprintf('%s-%04d-%s', $prefix, $currentCount, $kontrak->no_kontrak);
+
+                $barangData = [
+                    'id_kontrak'         => $validatedData['id_kontrak'],
+                    'kode_barcode'       => $kodeBarcode,
+                    'nama_barang'        => $validatedData['nama_barang'],
+                    'kategori'           => $validatedData['kategori'],
+                    'spesifikasi'        => $validatedData['spesifikasi'],
+                    'dokumentasi_barang' => $dokumentasiPaths,
+                ];
+
+                if ($validatedData['status_penguasaan'] == 'personal') {
+                    $barangData['id_karyawan_pemegang'] = $idKaryawanPemegang;
+                    $barangData['lokasi_fisik'] = null;
+                } else {
+                    $barangData['lokasi_fisik'] = $validatedData['lokasi_fisik'];
+                    $barangData['id_karyawan_pemegang'] = null;
+                }
+
+                $barang = Barang::create($barangData);
+                $createdBarangs[] = $barang;
+
+                Mobilisasi::create([
+                    'id_barang'        => $barang->id_barang,
+                    'asal'             => '(Vendor)',
+                    'id_penerima'      => $idKaryawanPemegang,
+                    'lokasi_tujuan'    => $validatedData['status_penguasaan'] == 'lokasi' ? $validatedData['lokasi_fisik'] : null,
+                    'id_user_operator' => $request->user()->id_user, 
+                ]);
+
+                Kondisi::create([
+                    'id_barang'        => $barang->id_barang,
+                    'id_user_operator' => $request->user()->id_user,
+                    'status_kondisi'   => 'Baik',
+                    'catatan'          => 'Registrasi Awal',
+                ]);
             }
 
-            $barang = Barang::create($barangData);
+            $this->catatLog(
+                'Barang', 
+                'Create', 
+                'Menambah ' . $validatedData['jumlah_barang'] . ' data barang baru (' . $validatedData['nama_barang'] . ')'
+            );
 
-            Mobilisasi::create([
-                'id_barang'        => $barang->id_barang,
-                'asal'             => '(Vendor)',
-                'id_penerima'      => $idKaryawanPemegang,
-                'lokasi_tujuan'    => $validatedData['status_penguasaan'] == 'lokasi' ? $validatedData['lokasi_fisik'] : null,
-                'id_user_operator' => $request->user()->id_user, 
-            ]);
-
-            Kondisi::create([
-                'id_barang'        => $barang->id_barang,
-                'id_user_operator' => $request->user()->id_user,
-                'status_kondisi'   => 'Baik',
-                'catatan'          => 'Registrasi Awal',
-            ]);
-
-            return $barang;
+            return $createdBarangs;
         });
 
         return response()->json([
             'status'  => 'success',
             'message' => 'Data Barang berhasil ditambah.',
-            'data'    => $barang
+            'data'    => $barangs
         ], 201);
     }
 
@@ -117,25 +180,32 @@ class ApiBarangController extends Controller
         $validatedData = $request->validate([
             'id_kontrak'           => 'required|exists:m_kontrak,id_kontrak',
             'nama_barang'          => 'required|string',
+            'kategori'             => 'required|in:Elektronik,Furnitur,Jaringan,Kendaraan,Peralatan Kantor,Lainnya',
             'spesifikasi'          => 'required|string',
-            'jumlah_barang'        => 'required|numeric|min:1',
             'status_penguasaan'    => 'required|in:personal,lokasi',
             'lokasi_fisik'         => 'required_if:status_penguasaan,lokasi|nullable|string',
             'nip'                  => 'required_if:status_penguasaan,personal|nullable|exists:m_karyawan,nip',
             'kondisi'              => 'nullable|string',
             'catatan'              => 'nullable|string',
-            'foto_barang'          => 'nullable|image|mimes:jpg,jpeg,png|max:2048',
+            'dokumentasi_barang'   => 'nullable|array',
+            'dokumentasi_barang.*' => 'file|mimes:jpg,jpeg,png,pdf|max:2048',
         ]);
 
-        $imagePath = $barang->foto_barang;
-        if ($request->hasFile('foto_barang')) {
-            if ($barang->foto_barang) {
-                Storage::disk('public')->delete($barang->foto_barang);
+        $dokumentasiPaths = $barang->dokumentasi_barang;
+        if ($request->hasFile('dokumentasi_barang')) {
+            if (!empty($barang->dokumentasi_barang)) {
+                foreach ($barang->dokumentasi_barang as $oldFile) {
+                    Storage::disk('public')->delete($oldFile);
+                }
             }
-            $imagePath = $request->file('foto_barang')->store('barang', 'public');
+            
+            $dokumentasiPaths = [];
+            foreach ($request->file('dokumentasi_barang') as $file) {
+                $dokumentasiPaths[] = $file->store('dokumentasi', 'public');
+            }
         }
 
-        $barang = DB::transaction(function () use ($request, $barang, $validatedData, $imagePath) {
+        $barang = DB::transaction(function () use ($request, $barang, $validatedData, $dokumentasiPaths) {
             $oldKaryawanId = $barang->getOriginal('id_karyawan_pemegang');
             $oldLokasiFisik = $barang->getOriginal('lokasi_fisik');
             $oldAsal = $oldKaryawanId ? ($barang->karyawan?->nama_karyawan ?? $oldKaryawanId) : $oldLokasiFisik;
@@ -147,11 +217,11 @@ class ApiBarangController extends Controller
             }
 
             $barang->fill([
-                'id_kontrak'    => $validatedData['id_kontrak'],
-                'nama_barang'   => $validatedData['nama_barang'],
-                'jumlah_barang' => $validatedData['jumlah_barang'],
-                'spesifikasi'   => $validatedData['spesifikasi'],
-                'foto_barang'   => $imagePath,
+                'id_kontrak'         => $validatedData['id_kontrak'],
+                'nama_barang'        => $validatedData['nama_barang'],
+                'kategori'           => $validatedData['kategori'],
+                'spesifikasi'        => $validatedData['spesifikasi'],
+                'dokumentasi_barang' => $dokumentasiPaths,
             ]);
 
             if ($validatedData['status_penguasaan'] == 'personal') {
@@ -161,7 +231,7 @@ class ApiBarangController extends Controller
                 if ($barang->isDirty('id_karyawan_pemegang') || $oldLokasiFisik !== null) {
                     Mobilisasi::create([
                         'id_barang'        => $barang->id_barang,
-                        'asal'             => $oldAsal,
+                        'asal'             => $oldAsal ?? '-',
                         'id_penerima'      => $idKaryawanPemegang,
                         'id_user_operator' => $request->user()->id_user,
                     ]);
@@ -173,7 +243,7 @@ class ApiBarangController extends Controller
                 if ($barang->isDirty('lokasi_fisik') || $oldKaryawanId !== null) {
                     Mobilisasi::create([
                         'id_barang'        => $barang->id_barang,
-                        'asal'             => $oldAsal,
+                        'asal'             => $oldAsal ?? '-',
                         'lokasi_tujuan'    => $validatedData['lokasi_fisik'],
                         'id_user_operator' => $request->user()->id_user,
                     ]);
@@ -191,6 +261,12 @@ class ApiBarangController extends Controller
                 ]);
             }
 
+            $this->catatLog(
+                'Barang', 
+                'Update', 
+                'Memperbarui data barang dengan kode barcode: ' . $barang->kode_barcode
+            );
+
             return $barang;
         });
 
@@ -201,15 +277,24 @@ class ApiBarangController extends Controller
         ], 200);
     }
 
-    public function destroy(string $id)
+    public function destroy(Request $request, string $id)
     {
         $barang = Barang::findOrFail($id);
+        $kodeBarcode = $barang->kode_barcode;
         
-        if ($barang->foto_barang) {
-            Storage::disk('public')->delete($barang->foto_barang);
+        if (!empty($barang->dokumentasi_barang)) {
+            foreach ($barang->dokumentasi_barang as $file) {
+                Storage::disk('public')->delete($file);
+            }
         }
 
         $barang->delete();
+
+        $this->catatLog(
+            'Barang', 
+            'Delete', 
+            'Menghapus data barang dengan kode barcode: ' . $kodeBarcode
+        );
         
         return response()->json([
             'status'  => 'success',

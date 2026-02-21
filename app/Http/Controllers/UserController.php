@@ -1,14 +1,18 @@
 <?php
+
 namespace App\Http\Controllers;
 
 use App\Models\Karyawan;
 use App\Models\User;
+use App\Traits\LogAktivitasTrait;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
 
 class UserController extends Controller
 {
+    use LogAktivitasTrait;
+
     public function index(Request $request)
     {
         $query = User::with('karyawan');
@@ -67,12 +71,22 @@ class UserController extends Controller
             'role'        => $validated['role'],
         ]);
 
+        $this->catatLog(
+            'User', 
+            'Create', 
+            'Menambah data user baru: ' . $validated['username']
+        );
+
         return redirect()->route('user.index')->with('success', 'Data User berhasil ditambah.');
     }
 
     public function show(User $user)
     {
-        return response()->json($user->load('karyawan'));
+        $user->load(['karyawan', 'logAktivitas' => function($query) {
+            $query->latest()->take(10);
+        }]);
+        
+        return response()->json($user);
     }
 
     public function update(Request $request, User $user)
@@ -90,8 +104,8 @@ class UserController extends Controller
         ]);
 
         $updateData = [
-            'username'    => $validated['username'],
-            'role'        => $validated['role'],
+            'username' => $validated['username'],
+            'role'     => $validated['role'],
         ];
 
         if (!empty($validated['password'])) {
@@ -100,13 +114,27 @@ class UserController extends Controller
 
         $user->update($updateData);
 
+        $this->catatLog(
+            'User', 
+            'Update', 
+            'Memperbarui data user: ' . $user->username
+        );
+
         return redirect()->route('user.index')->with('success', 'Data User berhasil diperbarui.');
     }
 
     public function destroy(User $user)
     {
+        $username = $user->username;
+
         $user->delete();
         
+        $this->catatLog(
+            'User', 
+            'Delete', 
+            'Menghapus data user: ' . $username
+        );
+
         return redirect()->route('user.index')->with('success', 'Data User berhasil dihapus.');
     }
 }

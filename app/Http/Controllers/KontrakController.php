@@ -1,12 +1,16 @@
 <?php
+
 namespace App\Http\Controllers;
 
 use App\Models\Kontrak;
+use App\Traits\LogAktivitasTrait;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
 class KontrakController extends Controller
 {
+    use LogAktivitasTrait;
+
     public function index(Request $request)
     {
         $query = Kontrak::withCount('barang');
@@ -51,7 +55,13 @@ class KontrakController extends Controller
             'pihak_pengada' => 'required|string',
         ]);
 
-        Kontrak::create($validated);
+        $kontrak = Kontrak::create($validated);
+
+        $this->catatLog(
+            'Kontrak', 
+            'Create', 
+            'Menambah data kontrak baru: ' . $kontrak->no_kontrak . ' (Vendor: ' . $kontrak->nama_vendor . ')'
+        );
 
         return redirect()->route('kontrak.index')->with('success', 'Data Kontrak berhasil ditambahkan.');
     }
@@ -77,12 +87,26 @@ class KontrakController extends Controller
 
         $kontrak->update($validated);
 
+        $this->catatLog(
+            'Kontrak', 
+            'Update', 
+            'Memperbarui data kontrak: ' . $kontrak->no_kontrak
+        );
+
         return redirect()->route('kontrak.index')->with('success', 'Data Kontrak berhasil diperbarui');
     }
 
     public function destroy(Kontrak $kontrak)
     {
+        $noKontrak = $kontrak->no_kontrak;
+        
         $kontrak->delete();
+
+        $this->catatLog(
+            'Kontrak', 
+            'Delete', 
+            'Menghapus data kontrak: ' . $noKontrak
+        );
         
         return redirect()->route('kontrak.index')->with('success','Data Kontrak berhasil dihapus.');
     }

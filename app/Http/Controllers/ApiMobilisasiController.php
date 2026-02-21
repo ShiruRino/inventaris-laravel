@@ -1,15 +1,34 @@
 <?php
+
 namespace App\Http\Controllers;
 
 use App\Models\Barang;
 use App\Models\Karyawan;
 use App\Models\Mobilisasi;
+use App\Traits\LogAktivitasTrait;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 
 class ApiMobilisasiController extends Controller
 {
+    use LogAktivitasTrait;
+
+    public function pending()
+    {
+        $barangPending = Barang::with('kontrak')
+            ->whereNull('id_karyawan_pemegang')
+            ->whereNull('lokasi_fisik')
+            ->latest('id_barang')
+            ->get();
+
+        return response()->json([
+            'status'  => 'success',
+            'message' => 'Data barang menunggu serah terima',
+            'data'    => $barangPending
+        ], 200);
+    }
+
     public function index(Request $request, $id)
     {
         $barang = Barang::findOrFail($id);
@@ -25,82 +44,90 @@ class ApiMobilisasiController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'kode_barcode'       => 'required|exists:m_barang,kode_barcode',
-            'nip_penerima'       => 'nullable|exists:m_karyawan,nip',
-            'lokasi_tujuan'      => 'nullable|string',
-            'bukti_serah_terima' => 'nullable|image|mimes:jpg,png,jpeg|max:2048',
+            'id_barang'          => 'required|array|min:1',
+            'id_barang.*'        => 'exists:m_barang,id_barang',
+            'jenis_transaksi'    => 'required|in:karyawan,lokasi',
+            'nip_penerima'       => 'required_if:jenis_transaksi,karyawan|nullable|exists:m_karyawan,nip',
+            'lokasi_tujuan'      => 'required_if:jenis_transaksi,lokasi|nullable|string',
+            'bukti_serah_terima' => 'nullable|image|mimes:jpg,png,jpeg,pdf|max:2048',
         ]);
 
-        $barang = Barang::where('kode_barcode', $validated['kode_barcode'])->firstOrFail();
-
-        if (!empty($validated['nip_penerima'])) {
+        $idPenerima = null;
+        if ($validated['jenis_transaksi'] == 'karyawan' && !empty($validated['nip_penerima'])) {
             $karyawanPenerima = Karyawan::where('nip', $validated['nip_penerima'])->firstOrFail();
-            
-            if ($barang->id_karyawan_pemegang === $karyawanPenerima->id_karyawan) {
-                return response()->json([
-                    'status'  => 'error',
-                    'message' => 'Barang sudah berada di penguasaan karyawan tersebut.'
-                ], 422);
-            }
-        } elseif (!empty($validated['lokasi_tujuan'])) {
-            if ($barang->lokasi_fisik === $validated['lokasi_tujuan']) {
-                return response()->json([
-                    'status'  => 'error',
-                    'message' => 'Barang sudah berada di lokasi tersebut.'
-                ], 422);
-            }
+            $idPenerima = $karyawanPenerima->id_karyawan;
         }
-
-        $asal = $barang->id_karyawan_pemegang !== null 
-        ? ($barang->karyawan?->nama_karyawan ?? $barang->karyawan?->nip) 
-        : ($barang->lokasi_fisik ?? '-');
 
         $buktiPath = null;
         if ($request->hasFile('bukti_serah_terima')) {
             $buktiPath = $request->file('bukti_serah_terima')->store('bukti_mobilisasi', 'public');
         }
 
-        $mobilisasi = DB::transaction(function () use ($request, $validated, $barang, $asal, $buktiPath) {
+        $mobilisasis = DB::transaction(function () use ($request, $validated, $idPenerima, $buktiPath) {
             
-            if (!empty($validated['nip_penerima'])) {
-                $karyawan = Karyawan::where('nip', $validated['nip_penerima'])->firstOrFail();
-                
-                $mob = Mobilisasi::create([
-                    'id_barang'          => $barang->id_barang,
-                    'asal'               => $asal,
-                    'id_penerima'        => $karyawan->id_karyawan,
-                    'id_user_operator'   => $request->user()->id_user,
-                    'bukti_serah_terima' => $buktiPath,
-                ]);
+            $barangs = Barang::whereIn('id_barang', $validated['id_barang'])->get();
+            $createdMobilisasis = [];
 
-                $barang->update([
-                    'lokasi_fisik'         => null,
-                    'id_karyawan_pemegang' => $karyawan->id_karyawan,
-                ]);
+            foreach ($barangs as $barang) {
+                if ($validated['jenis_transaksi'] == 'karyawan' && $barang->id_karyawan_pemegang === $idPenerima) {
+                    continue;
+                } elseif ($validated['jenis_transaksi'] == 'lokasi' && $barang->lokasi_fisik === $validated['lokasi_tujuan']) {
+                    continue;
+                }
 
-                return $mob;
-            } else {
-                $mob = Mobilisasi::create([
-                    'id_barang'          => $barang->id_barang,
-                    'asal'               => $asal,
-                    'lokasi_tujuan'      => $validated['lokasi_tujuan'],
-                    'id_user_operator'   => $request->user()->id_user,
-                    'bukti_serah_terima' => $buktiPath,
-                ]);
+                $asalString = $barang->id_karyawan_pemegang !== null 
+                    ? ($barang->karyawan?->nama_karyawan ?? $barang->karyawan?->nip) 
+                    : ($barang->lokasi_fisik ?? '(Vendor)');
 
-                $barang->update([
-                    'id_karyawan_pemegang' => null,
-                    'lokasi_fisik'         => $validated['lokasi_tujuan'],
-                ]);
+                if ($validated['jenis_transaksi'] == 'karyawan') {
+                    $mob = Mobilisasi::create([
+                        'id_barang'          => $barang->id_barang,
+                        'asal'               => $asalString,
+                        'id_penerima'        => $idPenerima,
+                        'id_user_operator'   => $request->user()->id_user,
+                        'bukti_serah_terima' => $buktiPath,
+                    ]);
 
-                return $mob;
+                    $barang->update([
+                        'lokasi_fisik'         => null,
+                        'id_karyawan_pemegang' => $idPenerima,
+                    ]);
+
+                    $createdMobilisasis[] = $mob;
+                } 
+                elseif ($validated['jenis_transaksi'] == 'lokasi') {
+                    $mob = Mobilisasi::create([
+                        'id_barang'          => $barang->id_barang,
+                        'asal'               => $asalString,
+                        'lokasi_tujuan'      => $validated['lokasi_tujuan'],
+                        'id_user_operator'   => $request->user()->id_user,
+                        'bukti_serah_terima' => $buktiPath,
+                    ]);
+
+                    $barang->update([
+                        'id_karyawan_pemegang' => null,
+                        'lokasi_fisik'         => $validated['lokasi_tujuan'],
+                    ]);
+
+                    $createdMobilisasis[] = $mob;
+                }
             }
+
+            $tujuan = $validated['jenis_transaksi'] == 'karyawan' ? 'Karyawan (NIP: ' . $validated['nip_penerima'] . ')' : 'Lokasi (' . $validated['lokasi_tujuan'] . ')';
+            
+            $this->catatLog(
+                'Mobilisasi', 
+                'Create', 
+                'Melakukan serah terima ' . count($createdMobilisasis) . ' barang ke ' . $tujuan
+            );
+
+            return $createdMobilisasis;
         });
 
         return response()->json([
             'status'  => 'success',
-            'message' => 'Data Mobilisasi berhasil ditambah.',
-            'data'    => $mobilisasi
+            'message' => 'Serah terima untuk barang terpilih berhasil diproses.',
+            'data'    => $mobilisasis
         ], 201);
     }
 
@@ -111,7 +138,7 @@ class ApiMobilisasiController extends Controller
         return response()->json($mobilisasi, 200);
     }
 
-    public function destroy(string $id)
+    public function destroy(Request $request, string $id)
     {
         $mobilisasi = Mobilisasi::findOrFail($id);
         
@@ -120,6 +147,12 @@ class ApiMobilisasiController extends Controller
         }
 
         $mobilisasi->delete();
+
+        $this->catatLog(
+            'Mobilisasi', 
+            'Delete', 
+            'Menghapus data mobilisasi (ID: ' . $id . ')'
+        );
         
         return response()->json([
             'status'  => 'success',

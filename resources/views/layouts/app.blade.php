@@ -43,10 +43,18 @@
                     <a href="{{ route('mobilisasi.index') }}" class="nav-link-custom {{ request()->routeIs('mobilisasi.*') ? 'active' : '' }}"> 
                         <i class="bi bi-arrow-left-right me-2"></i> Mobilisasi
                     </a>
+                    <a href="{{ route('tugas.index') }}" class="nav-link-custom {{ request()->routeIs('tugas.*') ? 'active' : '' }}"> 
+                        <i class="bi bi-clipboard me-2"></i> Tugas
+                    </a>
                     <a href="{{ route('user.index') }}" class="nav-link-custom {{ request()->routeIs('user.*') ? 'active' : '' }}"> 
                         <i class="bi bi-people me-2"></i> User
                     </a>
-                    {{-- Add other links here... --}}
+                    <a href="{{ route('log_login.index') }}" class="nav-link-custom {{ request()->routeIs('log_login.*') ? 'active' : '' }}"> 
+                        <i class="bi bi-clock-history me-2"></i> Log Login
+                    </a>
+                    <a href="{{ route('log_aktivitas.index') }}" class="nav-link-custom {{ request()->routeIs('log_aktivitas.*') ? 'active' : '' }}"> 
+                        <i class="bi bi-journal-text me-2"></i> Log Aktivitas
+                    </a>
                 </div>
             </div>
             

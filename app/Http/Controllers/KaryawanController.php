@@ -1,12 +1,16 @@
 <?php
+
 namespace App\Http\Controllers;
 
 use App\Models\Karyawan;
+use App\Traits\LogAktivitasTrait;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
 class KaryawanController extends Controller
 {
+    use LogAktivitasTrait;
+
     public function index(Request $request)
     {
         $query = Karyawan::withCount('barang');
@@ -48,7 +52,13 @@ class KaryawanController extends Controller
             'kontak'        => 'required|string',
         ]);
 
-        Karyawan::create($validated);
+        $karyawan = Karyawan::create($validated);
+
+        $this->catatLog(
+            'Karyawan', 
+            'Create', 
+            'Menambah data karyawan baru: ' . $karyawan->nama_karyawan . ' (NIP: ' . $karyawan->nip . ')'
+        );
 
         return redirect()->route('karyawan.index')->with('success', 'Data Karyawan berhasil ditambahkan');
     }
@@ -74,13 +84,28 @@ class KaryawanController extends Controller
         ]);
 
         $karyawan->update($validated);
+
+        $this->catatLog(
+            'Karyawan', 
+            'Update', 
+            'Memperbarui data karyawan: ' . $karyawan->nama_karyawan . ' (NIP: ' . $karyawan->nip . ')'
+        );
         
         return redirect()->route('karyawan.index')->with('success', 'Data Karyawan berhasil diperbarui');
     }
 
     public function destroy(Karyawan $karyawan)
     {
+        $namaKaryawan = $karyawan->nama_karyawan;
+        $nip = $karyawan->nip;
+
         $karyawan->delete();
+
+        $this->catatLog(
+            'Karyawan', 
+            'Delete', 
+            'Menghapus data karyawan: ' . $namaKaryawan . ' (NIP: ' . $nip . ')'
+        );
         
         return redirect()->route('karyawan.index')->with('success', 'Data Karyawan berhasil dihapus.');
     }

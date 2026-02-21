@@ -27,6 +27,8 @@ return new class extends Migration
             $table->string('username')->unique();
             $table->string('password');
             $table->enum('role', ['admin', 'lapangan']);
+            $table->timestamp('last_login_at')->nullable();
+            $table->timestamp('last_activity_at')->nullable();
             $table->rememberToken();
             $table->timestamps();
         });

@@ -5,6 +5,7 @@ use App\Http\Controllers\BarangController;
 use App\Http\Controllers\KaryawanController;
 use App\Http\Controllers\KontrakController;
 use App\Http\Controllers\MobilisasiController;
+use App\Http\Controllers\TugasController;
 use App\Http\Controllers\UserController;
 use App\Models\Barang;
 use App\Models\Kondisi;
@@ -21,14 +22,14 @@ Route::post('login', [AuthController::class, 'login'])->name('login');
 Route::post('logout', [AuthController::class, 'logout'])->name('logout');
 Route::middleware(['auth','role:admin'])->group(function(){
     Route::get('dasbor', function(){
-        $totalAset = Barang::sum('jumlah_barang');
-        $asetPersonal = Barang::whereNotNull('id_karyawan_pemegang')->sum('jumlah_barang');
-        $asetNonPersonal = Barang::whereNotNull('lokasi_fisik')->sum('jumlah_barang');
+        $totalAset = Barang::count();
+        $asetPersonal = Barang::whereNotNull('id_karyawan_pemegang')->count();
+        $asetNonPersonal = Barang::whereNotNull('lokasi_fisik')->count();
 
         $latestKondisiIds = Kondisi::select(DB::raw('MAX(id_kondisi)'))->groupBy('id_barang');
 
         $kondisiCounts = Kondisi::whereIn('id_kondisi', $latestKondisiIds)
-            ->select('status_kondisi', DB::raw('count(*) as total'))
+            ->select('status_kondisi', DB::raw('COUNT(*) as total'))
             ->groupBy('status_kondisi')
             ->pluck('total', 'status_kondisi');
 
@@ -39,7 +40,7 @@ Route::middleware(['auth','role:admin'])->group(function(){
 
         $asetRuslang = $asetRingan + $asetBerat + $asetHilang;
 
-        $kategoriData = Barang::select('kategori', DB::raw('SUM(jumlah_barang) as total'))
+        $kategoriData = Barang::select('kategori', DB::raw('COUNT(*) as total'))
             ->groupBy('kategori')
             ->pluck('total', 'kategori');
 
@@ -63,6 +64,10 @@ Route::middleware(['auth','role:admin'])->group(function(){
     Route::resource('barang', BarangController::class);
     Route::get('/barang/{id}/print', [BarangController::class, 'printLabel'])->name('barang.print');
     Route::get('mobilisasi/export', [MobilisasiController::class, 'export'])->name('mobilisasi.export');
+    Route::get('mobilisasi/export/pdf', [\App\Http\Controllers\MobilisasiController::class, 'exportPdf'])->name('mobilisasi.exportPdf');
     Route::resource('mobilisasi', MobilisasiController::class);
     Route::resource('user', UserController::class);
+    Route::resource('tugas', TugasController::class);
+    Route::get('/log-login', [\App\Http\Controllers\LogLoginController::class, 'index'])->name('log_login.index');
+    Route::get('/log-aktivitas', [\App\Http\Controllers\LogAktivitasController::class, 'index'])->name('log_aktivitas.index');
 });

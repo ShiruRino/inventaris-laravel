@@ -1,13 +1,17 @@
 <?php
+
 namespace App\Http\Controllers;
 
 use App\Models\Barang;
 use App\Models\Kondisi;
+use App\Traits\LogAktivitasTrait;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 
 class ApiKondisiController extends Controller
 {
+    use LogAktivitasTrait;
+
     public function index(Request $request, $id)
     {
         $barang = Barang::findOrFail($id);
@@ -44,6 +48,12 @@ class ApiKondisiController extends Controller
             'foto_kondisi'     => $fotoPath,
         ]);
 
+        $this->catatLog(
+            'Kondisi', 
+            'Create', 
+            'Menambah riwayat kondisi (' . $kondisi->status_kondisi . ') untuk barang: ' . $barang->nama_barang
+        );
+
         return response()->json([
             'status'  => 'success',
             'message' => 'Data Kondisi berhasil ditambah.',
@@ -78,6 +88,14 @@ class ApiKondisiController extends Controller
         $kondisi->update($validated);
         $kondisi->load('barang');
 
+        $namaBarang = $kondisi->barang ? $kondisi->barang->nama_barang : 'ID ' . $kondisi->id_barang;
+
+        $this->catatLog(
+            'Kondisi', 
+            'Update', 
+            'Memperbarui riwayat kondisi untuk barang: ' . $namaBarang
+        );
+
         return response()->json([
             'status'  => 'success',
             'message' => 'Data Kondisi berhasil diperbarui.',
@@ -94,6 +112,12 @@ class ApiKondisiController extends Controller
         }
 
         $kondisi->delete();
+
+        $this->catatLog(
+            'Kondisi', 
+            'Delete', 
+            'Menghapus riwayat kondisi (ID: ' . $id . ')'
+        );
 
         return response()->json([
             'status'  => 'success',

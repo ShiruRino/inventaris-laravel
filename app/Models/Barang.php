@@ -13,10 +13,13 @@ class Barang extends Model
         'kode_barcode',
         'nama_barang',
         'spesifikasi',
-        'jumlah_barang',
         'lokasi_fisik',
         'id_karyawan_pemegang',
-        'foto_barang',
+        'dokumentasi_barang',
+        'kategori',
+    ];
+    protected $casts = [
+        'dokumentasi_barang' => 'array',
     ];
     public function kontrak(){
         return $this->belongsTo(Kontrak::class, 'id_kontrak');
